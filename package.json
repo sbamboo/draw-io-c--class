@@ -1,0 +1,14 @@
+{
+  "name": "uml-plugin",
+  "private": true,
+  "scripts": {
+    "package": "node scripts/package.js",
+    "test": "node test-parser.js"
+  },
+  "dependencies": {
+    "monaco-editor": "0.52.2"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
+}

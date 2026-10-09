@@ -2,8 +2,7 @@
  * diagrams.net plugin: pseudo C# → UML class.
  *
  * Extras → C# class…, or the C# item on the menu bar.
- * One-shot load:
- *   https://app.diagrams.net/?p=https://YOUR_HOST/csharp-uml.js
+ * Paste plugin.js into the app.diagrams.net console. That file installs itself.
  */
 (function (root, factory) {
 	var api = factory();
@@ -20,10 +19,6 @@
 		});
 	}
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
-	var MONACO_VERSION = '0.52.2';
-	var MONACO_BASE = 'https://cdn.jsdelivr.net/npm/monaco-editor@' + MONACO_VERSION + '/min';
-	var monacoPromise = null;
-
 	var SAMPLE = [
 		'class MYClass {',
 		'    private memberVar;',
@@ -57,52 +52,125 @@
 			return;
 		}
 
-		mxResources.parse('csharpUml=C# class...');
+		if (!ui.csharpUmlInstalled) {
+			ui.csharpUmlInstalled = true;
+			mxResources.parse('csharpUml=C# class...');
 
-		ui.actions.addAction('csharpUml', function () {
-			openDialog(ui);
-		});
+			ui.actions.addAction('csharpUml', function () {
+				openDialog(ui, false);
+			});
 
-		var extras = ui.menus.get('extras');
+			var extras = ui.menus.get('extras');
 
-		if (extras != null) {
-			var previous = extras.funct;
+			if (extras != null) {
+				var previous = extras.funct;
 
-			extras.funct = function (menu, parent) {
-				previous.apply(this, arguments);
-				ui.menus.addMenuItems(menu, ['-', 'csharpUml'], parent);
-			};
+				extras.funct = function (menu, parent) {
+					previous.apply(this, arguments);
+					ui.menus.addMenuItems(menu, ['-', 'csharpUml'], parent);
+				};
+			}
+
+			hookFormatPanel(ui);
+			ui.addListener('currentThemeChanged', function () {
+				window.setTimeout(function () {
+					addToolbarButton(ui);
+				}, 0);
+			});
 		}
 
-		addMenuButton(ui);
+		addToolbarButton(ui);
 	}
 
-	function addMenuButton(ui) {
-		if (ui.menubar == null || ui.menubar.container == null) {
+	function addToolbarButton(ui) {
+		var hosts = [];
+
+		if (ui.sketchMenubarElt != null) {
+			hosts.push(ui.sketchMenubarElt);
+		}
+
+		if (ui.toolbar != null && ui.toolbar.container != null) {
+			hosts.push(ui.toolbar.container);
+		}
+
+		if (!hosts.length && ui.menubar != null && ui.menubar.container != null) {
+			hosts.push(ui.menubar.container);
+		}
+
+		for (var i = 0; i < hosts.length; i++) {
+			var host = hosts[i];
+
+			if (host.querySelector('[data-csharp-uml-insert]')) {
+				continue;
+			}
+
+			var btn = document.createElement('a');
+			btn.setAttribute('data-csharp-uml-insert', '1');
+			btn.setAttribute('title', 'Insert UML class from C#');
+			btn.textContent = 'C#';
+			btn.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 10px;margin:0 4px;cursor:pointer;font:600 12px sans-serif;border-radius:4px;background:#1e1e1e;color:#fff;flex-shrink:0;text-decoration:none;user-select:none;';
+
+			mxEvent.addListener(btn, 'click', function (evt) {
+				mxEvent.consume(evt);
+				openDialog(ui, false);
+			});
+
+			host.insertBefore(btn, host.firstChild);
+		}
+	}
+
+	function hookFormatPanel(ui) {
+		var format = ui.format;
+
+		if (format == null || format.immediateRefresh == null || format.immediateRefresh.csharpUml) {
 			return;
 		}
 
-		if (ui.menubar.container.querySelector('[data-csharp-uml]')) {
+		var previous = format.immediateRefresh;
+
+		var wrapped = function () {
+			previous.apply(this, arguments);
+			addUpdateButton(ui, this);
+		};
+
+		wrapped.csharpUml = true;
+		format.immediateRefresh = wrapped;
+	}
+
+	function addUpdateButton(ui, format) {
+		if (format.container == null) {
 			return;
 		}
 
-		var elt = document.createElement('a');
-		elt.className = 'geMenubar';
-		elt.setAttribute('data-csharp-uml', '1');
-		elt.setAttribute('title', 'Insert a UML class from pseudo C#');
-		mxUtils.write(elt, 'C#');
+		var existing = format.container.querySelector('[data-csharp-uml-update]');
 
-		mxEvent.addListener(elt, 'click', function (evt) {
-			mxEvent.consume(evt);
-			ui.actions.get('csharpUml').funct();
+		if (existing != null) {
+			existing.parentNode.removeChild(existing);
+		}
+
+		var cell = findPseudoCell(ui.editor.graph.getSelectionCell());
+
+		if (cell == null) {
+			return;
+		}
+
+		var block = document.createElement('div');
+		block.setAttribute('data-csharp-uml-update', '1');
+		block.className = 'geFormatEntry';
+		block.style.padding = '10px 12px 6px';
+
+		var btn = mxUtils.button('Update C#', function () {
+			openDialog(ui, true);
 		});
-
-		ui.menubar.container.appendChild(elt);
+		btn.className = 'geBtn gePrimaryBtn';
+		btn.style.width = '100%';
+		block.appendChild(btn);
+		format.container.insertBefore(block, format.container.firstChild);
 	}
 
-	function openDialog(ui) {
+	function openDialog(ui, update) {
 		var graph = ui.editor.graph;
-		var selected = findPseudoCell(graph.getSelectionCell());
+		var selected = update ? findPseudoCell(graph.getSelectionCell()) : null;
 		var editing = selected != null;
 		var initial = editing ? getPseudo(selected) : SAMPLE;
 
@@ -196,35 +264,7 @@
 			return Promise.resolve(window.monaco);
 		}
 
-		if (monacoPromise != null) {
-			return monacoPromise;
-		}
-
-		monacoPromise = new Promise(function (resolve, reject) {
-			window.MonacoEnvironment = {
-				getWorkerUrl: function () {
-					var src = 'self.MonacoEnvironment={baseUrl:"' + MONACO_BASE + '/"};' +
-						'importScripts("' + MONACO_BASE + '/vs/base/worker/workerMain.js");';
-					return 'data:text/javascript;charset=utf-8,' + encodeURIComponent(src);
-				}
-			};
-
-			var script = document.createElement('script');
-			script.src = MONACO_BASE + '/vs/loader.js';
-			script.onload = function () {
-				window.require.config({ paths: { vs: MONACO_BASE + '/vs' } });
-				window.require(['vs/editor/editor.main'], function () {
-					resolve(window.monaco);
-				}, reject);
-			};
-			script.onerror = function () {
-				monacoPromise = null;
-				reject(new Error('could not load ' + script.src));
-			};
-			document.head.appendChild(script);
-		});
-
-		return monacoPromise;
+		return Promise.reject(new Error('Monaco is not bundled. Run npm run package and paste combined.js.'));
 	}
 
 	function notify(ui, message) {
@@ -887,8 +927,26 @@
 			.replace(/>/g, '&gt;');
 	}
 
+	function attachMonaco(monaco, css, conf, language) {
+		globalThis.MonacoEnvironment = {
+			getWorker: function () {
+				throw new Error('web workers are blocked');
+			}
+		};
+
+		monaco.languages.register({ id: 'csharp', extensions: ['.cs'], aliases: ['C#', 'csharp'] });
+		monaco.languages.setMonarchTokensProvider('csharp', language);
+		monaco.languages.setLanguageConfiguration('csharp', conf);
+
+		var style = document.createElement('style');
+		style.textContent = css;
+		document.head.appendChild(style);
+		globalThis.monaco = monaco;
+	}
+
 	return {
 		install: install,
-		parseDocument: parseDocument
+		parseDocument: parseDocument,
+		attachMonaco: attachMonaco
 	};
 });
