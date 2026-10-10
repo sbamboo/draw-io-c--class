@@ -31,7 +31,19 @@ esbuild.build({
 		'.ttf': 'empty'
 	},
 	banner: {
-		js: '/* Paste this file into the app.diagrams.net console. It installs itself. */'
+		js: [
+			'/* Paste this file into the app.diagrams.net console. It installs itself. */',
+			'(function undefine() {',
+			'  var root = typeof globalThis !== "undefined" ? globalThis : window;',
+			'  ["monaco", "MonacoEnvironment", "CsharpUml"].forEach(function (name) {',
+			'    try { delete root[name]; } catch (e) {}',
+			'    try { root[name] = undefined; } catch (e) {}',
+			'  });',
+			'  if (typeof Draw !== "undefined" && typeof Draw.loadPlugin === "function") {',
+			'    Draw.loadPlugin(function (ui) { ui.csharpUmlInstalled = false; });',
+			'  }',
+			'})();'
+		].join('\n')
 	},
 	plugins: [{
 		name: 'plugin-entry',

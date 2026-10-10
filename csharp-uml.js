@@ -43,6 +43,56 @@
 		'spacingLeft=3;spacingRight=3;rotatable=0;labelPosition=right;points=[];' +
 		'portConstraint=eastwest;strokeColor=inherit;';
 
+	var INHERIT_STYLE =
+		'edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;' +
+		'endArrow=classic;endFill=1;' +
+		'exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;';
+
+	var IMPLEMENT_STYLE =
+		'edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;' +
+		'endArrow=block;endFill=0;endSize=14;' +
+		'exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;';
+
+	var REF_EDGE =
+		'edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=0;' +
+		'exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;';
+
+	var REF_KIND = {
+		assoc: 'association',
+		association: 'association',
+		agg: 'aggregation',
+		aggregation: 'aggregation',
+		comp: 'composition',
+		composition: 'composition'
+	};
+
+	var NON_REF = {
+		void: true,
+		bool: true,
+		boolean: true,
+		byte: true,
+		sbyte: true,
+		char: true,
+		decimal: true,
+		double: true,
+		float: true,
+		int: true,
+		uint: true,
+		long: true,
+		ulong: true,
+		short: true,
+		ushort: true,
+		string: true,
+		object: true,
+		var: true,
+		dynamic: true,
+		nint: true,
+		nuint: true
+	};
+
+	var REF_POINT_KEYS = ['exitX', 'exitY', 'exitDx', 'exitDy', 'entryX', 'entryY', 'entryDx', 'entryDy'];
+	var REF_ARROW_KEYS = ['startArrow', 'endArrow', 'startFill', 'endFill', 'startSize', 'endSize'];
+
 	var VISIBILITY = { public: '+', private: '-', protected: '#', internal: '~' };
 	var LEADING_MOD =
 		/^(public|private|protected|internal|static|abstract|virtual|override|readonly|async|sealed|partial|new|extern|unsafe|volatile|const|required)\s+/i;
@@ -63,26 +113,56 @@
 			var extras = ui.menus.get('extras');
 
 			if (extras != null) {
-				var previous = extras.funct;
+				if (extras.csharpUmlBase == null) {
+					extras.csharpUmlBase = extras.funct;
+				}
+
+				var base = extras.csharpUmlBase;
 
 				extras.funct = function (menu, parent) {
-					previous.apply(this, arguments);
+					base.apply(this, arguments);
 					ui.menus.addMenuItems(menu, ['-', 'csharpUml'], parent);
 				};
 			}
 
 			hookFormatPanel(ui);
-			ui.addListener('currentThemeChanged', function () {
+
+			if (ui.csharpUmlThemeListener != null) {
+				ui.removeListener(ui.csharpUmlThemeListener);
+			}
+
+			ui.csharpUmlThemeListener = function () {
 				window.setTimeout(function () {
 					addToolbarButton(ui);
 				}, 0);
-			});
+				window.setTimeout(function () {
+					addToolbarButton(ui);
+				}, 250);
+			};
+			ui.addListener('currentThemeChanged', ui.csharpUmlThemeListener);
 		}
 
 		addToolbarButton(ui);
+		window.setTimeout(function () {
+			addToolbarButton(ui);
+		}, 250);
+	}
+
+	function ensureToolbarButtonStyle() {
+		var style = document.getElementById('csharp-uml-toolbar-style');
+
+		if (style == null) {
+			style = document.createElement('style');
+			style.id = 'csharp-uml-toolbar-style';
+		}
+
+		style.textContent = 'html body [data-csharp-uml-insert]{display:inline-flex !important;align-items:center !important;justify-content:center !important;align-self:center !important;box-sizing:border-box !important;height:28px !important;min-height:28px !important;max-height:28px !important;width:auto !important;min-width:36px !important;margin:0 4px !important;padding:0 10px !important;padding-top:0 !important;padding-bottom:0 !important;line-height:28px !important;text-align:center !important;font-family:sans-serif !important;font-size:12px !important;font-weight:600 !important;border-radius:4px !important;background:#1e1e1e !important;color:#fff !important;flex:0 0 auto !important;vertical-align:middle !important;text-decoration:none !important;user-select:none !important;cursor:pointer !important;position:relative !important;top:0 !important;}';
+		document.head.appendChild(style);
 	}
 
 	function addToolbarButton(ui) {
+		ensureToolbarButtonStyle();
+
 		var hosts = [];
 
 		if (ui.sketchMenubarElt != null) {
@@ -97,18 +177,21 @@
 			hosts.push(ui.menubar.container);
 		}
 
+		var stale = document.querySelectorAll('[data-csharp-uml-insert]');
+
+		for (var s = 0; s < stale.length; s++) {
+			if (stale[s].parentNode != null) {
+				stale[s].parentNode.removeChild(stale[s]);
+			}
+		}
+
 		for (var i = 0; i < hosts.length; i++) {
 			var host = hosts[i];
-
-			if (host.querySelector('[data-csharp-uml-insert]')) {
-				continue;
-			}
-
-			var btn = document.createElement('a');
+			var btn = document.createElement('div');
 			btn.setAttribute('data-csharp-uml-insert', '1');
+			btn.setAttribute('role', 'button');
 			btn.setAttribute('title', 'Insert UML class from C#');
 			btn.textContent = 'C#';
-			btn.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 10px;margin:0 4px;cursor:pointer;font:600 12px sans-serif;border-radius:4px;background:#1e1e1e;color:#fff;flex-shrink:0;text-decoration:none;user-select:none;';
 
 			mxEvent.addListener(btn, 'click', function (evt) {
 				mxEvent.consume(evt);
@@ -122,18 +205,20 @@
 	function hookFormatPanel(ui) {
 		var format = ui.format;
 
-		if (format == null || format.immediateRefresh == null || format.immediateRefresh.csharpUml) {
+		if (format == null || format.immediateRefresh == null) {
 			return;
 		}
 
-		var previous = format.immediateRefresh;
+		var current = format.immediateRefresh;
+		var base = current.csharpUmlBase || current;
 
 		var wrapped = function () {
-			previous.apply(this, arguments);
+			base.apply(this, arguments);
 			addUpdateButton(ui, this);
 		};
 
 		wrapped.csharpUml = true;
+		wrapped.csharpUmlBase = base;
 		format.immediateRefresh = wrapped;
 	}
 
@@ -166,6 +251,69 @@
 		btn.style.width = '100%';
 		block.appendChild(btn);
 		format.container.insertBefore(block, format.container.firstChild);
+	}
+
+	function ensureCsharpDialogCss() {
+		if (document.getElementById('csharp-uml-dialog-style') != null) {
+			return;
+		}
+
+		var style = document.createElement('style');
+		style.id = 'csharp-uml-dialog-style';
+		style.textContent = [
+			'.geDialog.csharp-uml-dialog{background:#1e1e1e;color:#cccccc;border-color:#3c3c3c;}',
+			'.geDialog.csharp-uml-dialog>.geButton{',
+			'border-radius:50% !important;width:28px !important;height:28px !important;',
+			'top:10px !important;right:10px !important;background-image:none !important;',
+			'background-color:#3c3c3c !important;color:#d4d4d4 !important;',
+			'display:flex !important;align-items:center !important;justify-content:center !important;',
+			'font:600 16px/1 sans-serif !important;opacity:1 !important;padding:0 !important;}',
+			'.geDialog.csharp-uml-dialog .csharp-uml-buttons{padding:8px 16px 4px;box-sizing:border-box;}',
+			'.geDialog.csharp-uml-dialog>.geButton:focus{outline:2px solid #569cd6;outline-offset:2px;}'
+		].join('');
+		document.head.appendChild(style);
+	}
+
+	function grayBorderColor(color) {
+		var match = String(color || '').match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+
+		if (match == null) {
+			return '#8a8a8a';
+		}
+
+		var channels = [Number(match[1]), Number(match[2]), Number(match[3])];
+		var average = (channels[0] + channels[1] + channels[2]) / 3;
+
+		return 'rgb(' + channels.map(function (channel) {
+			return Math.max(0, Math.min(255, Math.round(channel * 0.7 + average * 0.3)));
+		}).join(',') + ')';
+	}
+
+	function styleCsharpDialog(dlg) {
+		ensureCsharpDialogCss();
+		var dialog = dlg.container != null ? dlg.container.parentNode : null;
+
+		if (dialog != null) {
+			dialog.classList.add('csharp-uml-dialog');
+			var closer = dialog.querySelector(':scope > .geButton');
+
+			if (closer != null && closer.getAttribute('data-csharp-uml-close') == null) {
+				closer.setAttribute('data-csharp-uml-close', '1');
+				closer.tabIndex = 0;
+				closer.textContent = '\u00d7';
+			}
+		}
+
+		if (dlg.okButton != null && dlg.okButton.parentNode != null) {
+			dlg.okButton.parentNode.classList.add('csharp-uml-buttons');
+		}
+
+		if (dlg.cancelBtn != null && window.getComputedStyle) {
+			var gray = grayBorderColor(window.getComputedStyle(dlg.cancelBtn).borderTopColor);
+			dlg.cancelBtn.style.color = gray;
+			dlg.cancelBtn.style.borderColor = gray;
+			dlg.cancelBtn.style.backgroundColor = 'transparent';
+		}
 	}
 
 	function openDialog(ui, update) {
@@ -220,12 +368,66 @@
 			null, null, false, null, true
 		);
 		dlg.container.style.background = '#1e1e1e';
+		dlg.container.style.color = '#cccccc';
+
+		var dialogEl = null;
+
+		function isEscape(evt) {
+			return evt.key === 'Escape' || evt.keyCode === 27;
+		}
+
+		function monacoWidgetOpen() {
+			return document.querySelector('.suggest-widget.visible, .parameter-hints-widget.visible, .find-widget.visible') != null;
+		}
+
+		function onEscapeCapture(evt) {
+			if (!isEscape(evt)) {
+				return;
+			}
+
+			if (dialogEl == null || !dialogEl.isConnected) {
+				document.removeEventListener('keydown', onEscapeCapture, true);
+				return;
+			}
+
+			if (monacoWidgetOpen()) {
+				return;
+			}
+
+			evt.preventDefault();
+			evt.stopPropagation();
+			var closer = dialogEl.querySelector(':scope > .geButton');
+
+			if (closer != null) {
+				closer.focus();
+			}
+		}
+
+		function onEscapeBubble(evt) {
+			if (isEscape(evt)) {
+				evt.stopPropagation();
+			}
+		}
+
 		ui.showDialog(dlg.container, 720, 560, true, true, function () {
+			document.removeEventListener('keydown', onEscapeCapture, true);
+
+			if (dialogEl != null) {
+				dialogEl.removeEventListener('keydown', onEscapeBubble);
+			}
+
 			if (editor != null) {
 				editor.dispose();
 				editor = null;
 			}
 		});
+		styleCsharpDialog(dlg);
+		dialogEl = dlg.container.parentNode;
+
+		if (dialogEl != null) {
+			document.addEventListener('keydown', onEscapeCapture, true);
+			dialogEl.addEventListener('keydown', onEscapeBubble);
+		}
 
 		loadMonaco().then(function (monaco) {
 			host.textContent = '';
@@ -314,18 +516,31 @@
 					var geo = cell.geometry.clone();
 					geo.width = size.width;
 					geo.height = size.height;
+					var parked = parkRowEdges(graph, cell);
 					graph.getModel().setValue(cell, userObject(model, source));
 					graph.getModel().setStyle(cell, classStyle(size.startSize));
 					graph.getModel().setGeometry(cell, geo);
-					var kids = graph.getChildCells(cell);
+					var kids = childVertices(graph, cell);
 
 					if (kids.length) {
-						graph.removeCells(kids);
+						graph.removeCells(kids, false);
 					}
+
+					fillCompartments(graph, cell, model, size.width);
+					restoreRowEdges(graph, cell, parked);
+					created.push(cell);
+					continue;
 				}
 
 				fillCompartments(graph, cell, model, size.width);
 				created.push(cell);
+			}
+
+			syncAllInherits(graph);
+			syncAllRefs(graph);
+
+			for (var n = 0; n < created.length; n++) {
+				alignIncomingSides(graph, created[n]);
 			}
 
 			graph.setSelectionCells(created);
@@ -334,19 +549,941 @@
 		}
 	}
 
-	function fillCompartments(graph, cell, model, width) {
-		var attributes = model.attributes.length ? model.attributes : [{ text: ' ', fontStyle: 0 }];
-		var operations = model.operations.length ? model.operations : [{ text: ' ', fontStyle: 0 }];
+	function childVertices(graph, cell) {
+		var kids = graph.getChildCells(cell) || [];
+		var vertices = [];
 
-		for (var i = 0; i < attributes.length; i++) {
-			addRow(graph, cell, attributes[i], width);
+		for (var i = 0; i < kids.length; i++) {
+			if (!graph.getModel().isEdge(kids[i])) {
+				vertices.push(kids[i]);
+			}
+		}
+
+		return vertices;
+	}
+
+	function rowKey(value) {
+		if (value != null && value.nodeType === 1 && typeof value.getAttribute === 'function') {
+			value = value.getAttribute('label') || '';
+		}
+
+		return visibleText(value || '').replace(/\s*\/\/.*$/, '').replace(/\s+/g, ' ').trim();
+	}
+
+	function parkRowEdges(graph, cell) {
+		var model = graph.getModel();
+		var kids = childVertices(graph, cell);
+		var parked = [];
+
+		for (var i = 0; i < kids.length; i++) {
+			var kid = kids[i];
+			var edges = graph.getConnections(kid) || [];
+			var key = rowKey(model.getValue(kid));
+
+			for (var e = 0; e < edges.length; e++) {
+				var edge = edges[e];
+				var asSource = model.getTerminal(edge, true) === kid;
+				var asTarget = model.getTerminal(edge, false) === kid;
+
+				parked.push({
+					edge: edge,
+					key: key,
+					asSource: asSource,
+					asTarget: asTarget,
+					geometry: edge.geometry != null ? edge.geometry.clone() : null,
+					style: model.getStyle(edge)
+				});
+
+				if (asSource) {
+					model.setTerminal(edge, cell, true);
+				}
+
+				if (asTarget) {
+					model.setTerminal(edge, cell, false);
+				}
+			}
+		}
+
+		return parked;
+	}
+
+	function classCellName(cell) {
+		var value = cell != null ? cell.value : null;
+		var label = '';
+
+		if (value != null && value.nodeType === 1 && typeof value.getAttribute === 'function') {
+			label = value.getAttribute('label') || '';
+		} else if (value != null) {
+			label = String(value);
+		}
+
+		return visibleText(label).replace(/<<[^<>]+>>/g, ' ').replace(/\s+/g, ' ').trim();
+	}
+
+	function classOwner(graph, terminal) {
+		var cell = terminal;
+		var root = graph.getDefaultParent();
+
+		while (cell != null && cell !== root) {
+			if (getPseudo(cell) !== '') {
+				return cell;
+			}
+
+			cell = cell.parent;
+		}
+
+		return terminal;
+	}
+
+	function normalizeTypeName(name) {
+		return String(name || '').replace(/\s+/g, '');
+	}
+
+	function stripGenerics(name) {
+		var out = '';
+		var depth = 0;
+
+		for (var i = 0; i < name.length; i++) {
+			var ch = name.charAt(i);
+
+			if (ch === '<') {
+				depth++;
+			} else if (ch === '>') {
+				depth = Math.max(0, depth - 1);
+			} else if (depth === 0) {
+				out += ch;
+			}
+		}
+
+		return out;
+	}
+
+	function nameKeys(name) {
+		var full = normalizeTypeName(name);
+		var keys = [];
+
+		if (full) {
+			keys.push(full);
+		}
+
+		var simple = stripGenerics(full);
+
+		if (simple && keys.indexOf(simple) < 0) {
+			keys.push(simple);
+		}
+
+		return keys;
+	}
+
+	function sameTypeName(left, right) {
+		var a = nameKeys(left);
+		var b = nameKeys(right);
+
+		for (var i = 0; i < a.length; i++) {
+			if (b.indexOf(a[i]) >= 0) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	function indexClasses(graph) {
+		var exact = {};
+		var simple = {};
+		var cells = childVertices(graph, graph.getDefaultParent());
+
+		for (var i = 0; i < cells.length; i++) {
+			var keys = nameKeys(classCellName(cells[i]));
+
+			if (!keys.length) {
+				continue;
+			}
+
+			if (exact[keys[0]] == null) {
+				exact[keys[0]] = cells[i];
+			}
+		}
+
+		for (var j = 0; j < cells.length; j++) {
+			var parts = nameKeys(classCellName(cells[j]));
+
+			if (parts.length > 1 && exact[parts[1]] == null && simple[parts[1]] == null) {
+				simple[parts[1]] = cells[j];
+			}
+		}
+
+		return { exact: exact, simple: simple };
+	}
+
+	function lookupClass(index, base) {
+		var keys = nameKeys(base);
+
+		for (var i = 0; i < keys.length; i++) {
+			if (index.exact[keys[i]] != null) {
+				return index.exact[keys[i]];
+			}
+		}
+
+		for (var j = 0; j < keys.length; j++) {
+			if (index.simple[keys[j]] != null) {
+				return index.simple[keys[j]];
+			}
+		}
+
+		var leaf = typeLeaf(base);
+
+		if (leaf && index.exact[leaf] != null) {
+			return index.exact[leaf];
+		}
+
+		if (leaf && index.simple[leaf] != null) {
+			return index.simple[leaf];
+		}
+
+		return null;
+	}
+
+	function typeLeaf(name) {
+		var simple = stripGenerics(normalizeTypeName(name));
+		var parts = simple.split('.');
+		return parts[parts.length - 1] || '';
+	}
+
+	function sameRefName(left, right) {
+		if (sameTypeName(left, right)) {
+			return true;
+		}
+
+		var a = typeLeaf(left);
+		var b = typeLeaf(right);
+		return a !== '' && a === b;
+	}
+
+	function isInheritEdge(edge) {
+		var value = edge != null ? edge.value : null;
+
+		return value != null && value.nodeType === 1 && typeof value.getAttribute === 'function' &&
+			value.getAttribute('csharpInherit') === '1';
+	}
+
+	function inheritEdges(graph) {
+		var cells = graph.getChildCells(graph.getDefaultParent()) || [];
+		var edges = [];
+
+		for (var i = 0; i < cells.length; i++) {
+			if (graph.getModel().isEdge(cells[i]) && isInheritEdge(cells[i])) {
+				edges.push(cells[i]);
+			}
+		}
+
+		return edges;
+	}
+
+	function edgeLinks(graph, edge, child, parent) {
+		var model = graph.getModel();
+		var source = classOwner(graph, model.getTerminal(edge, true));
+		var target = classOwner(graph, model.getTerminal(edge, false));
+
+		return (source === child && target === parent) || (source === parent && target === child);
+	}
+
+	function modelForCell(cell) {
+		var pseudo = getPseudo(cell);
+
+		if (!pseudo) {
+			return null;
+		}
+
+		var models = parseDocument(pseudo);
+		var name = classCellName(cell);
+
+		for (var i = 0; i < models.length; i++) {
+			if (sameTypeName(models[i].name, name) || sameTypeName(models[i].simpleName, name)) {
+				return models[i];
+			}
+		}
+
+		return models.length === 1 ? models[0] : null;
+	}
+
+	function cellKind(cell) {
+		var model = modelForCell(cell);
+
+		if (model != null) {
+			return model.kind;
+		}
+
+		return /<<\s*interface\s*>>/i.test(classCellName(cell)) ? 'interface' : '';
+	}
+
+	function inheritValue(child, base) {
+		var obj = mxUtils.createXmlDocument().createElement('object');
+		obj.setAttribute('label', '');
+		obj.setAttribute('csharpInherit', '1');
+		obj.setAttribute('childId', child.id);
+		obj.setAttribute('parentName', normalizeTypeName(base));
+		return obj;
+	}
+
+	function styleValue(style, key) {
+		var match = new RegExp('(?:^|;)' + key + '=([^;]*)').exec(style || '');
+
+		return match ? match[1] : null;
+	}
+
+	function setStyleValue(style, key, value) {
+		var next = String(style || '');
+		var pattern = new RegExp('(^|;)' + key + '=[^;]*');
+
+		if (pattern.test(next)) {
+			return next.replace(pattern, '$1' + key + '=' + value);
+		}
+
+		if (next && next.charAt(next.length - 1) !== ';') {
+			next += ';';
+		}
+
+		return next + key + '=' + value + ';';
+	}
+
+	function inheritStyle(parent, index, count) {
+		var style = cellKind(parent) === 'interface' ? IMPLEMENT_STYLE : INHERIT_STYLE;
+
+		if (count > 1) {
+			var slot = 0.3 + (0.4 * index / (count - 1));
+			style = style.replace('exitX=0.5', 'exitX=' + slot.toFixed(2)).replace('entryX=0.5', 'entryX=' + slot.toFixed(2));
+		}
+
+		return style;
+	}
+
+	function applyConnectorStyle(graph, edge, parent) {
+		var model = graph.getModel();
+		var style = model.getStyle(edge) || '';
+		var implement = cellKind(parent) === 'interface';
+		var keys = ['exitX', 'exitY', 'exitDx', 'exitDy', 'entryX', 'entryY', 'entryDx', 'entryDy'];
+		var saved = {};
+
+		for (var i = 0; i < keys.length; i++) {
+			saved[keys[i]] = styleValue(style, keys[i]);
+		}
+
+		style = setStyleValue(style, 'edgeStyle', 'orthogonalEdgeStyle');
+		style = setStyleValue(style, 'rounded', '0');
+		style = setStyleValue(style, 'orthogonalLoop', '1');
+		style = setStyleValue(style, 'jettySize', 'auto');
+		style = setStyleValue(style, 'html', '1');
+		style = setStyleValue(style, 'endArrow', implement ? 'block' : 'classic');
+		style = setStyleValue(style, 'endFill', implement ? '0' : '1');
+		style = setStyleValue(style, 'dashed', '0');
+
+		if (implement) {
+			style = setStyleValue(style, 'endSize', '14');
+		}
+
+		for (var k = 0; k < keys.length; k++) {
+			if (saved[keys[k]] != null) {
+				style = setStyleValue(style, keys[k], saved[keys[k]]);
+			}
+		}
+
+		model.setStyle(edge, style);
+	}
+
+	function syncInherits(graph, cell, bases, index) {
+		var edges = inheritEdges(graph);
+		var keep = {};
+
+		for (var b = 0; b < bases.length; b++) {
+			var parent = lookupClass(index, bases[b]);
+
+			if (parent == null || parent === cell) {
+				continue;
+			}
+
+			var found = null;
+
+			for (var e = 0; e < edges.length; e++) {
+				var edge = edges[e];
+				var value = edge.value;
+
+				if (value.getAttribute('childId') !== cell.id || normalizeTypeName(value.getAttribute('parentName')) !== normalizeTypeName(bases[b])) {
+					continue;
+				}
+
+				if (edgeLinks(graph, edge, cell, parent)) {
+					found = edge;
+					break;
+				}
+			}
+
+			if (found != null) {
+				keep[found.id] = true;
+				applyConnectorStyle(graph, found, parent);
+				continue;
+			}
+
+			graph.insertEdge(
+				graph.getDefaultParent(),
+				null,
+				inheritValue(cell, bases[b]),
+				cell,
+				parent,
+				inheritStyle(parent, b, bases.length)
+			);
+		}
+
+		for (var r = 0; r < edges.length; r++) {
+			var old = edges[r];
+
+			if (old.value.getAttribute('childId') === cell.id && !keep[old.id]) {
+				graph.removeCells([old], false);
+			}
+		}
+	}
+
+	function syncAllInherits(graph) {
+		var index = indexClasses(graph);
+		var cells = childVertices(graph, graph.getDefaultParent());
+
+		for (var i = 0; i < cells.length; i++) {
+			if (getPseudo(cells[i]) === '') {
+				continue;
+			}
+
+			var model = modelForCell(cells[i]);
+			syncInherits(graph, cells[i], model != null && model.bases ? model.bases : [], index);
+		}
+	}
+
+	function refStyle(kind) {
+		if (kind === 'aggregation') {
+			return REF_EDGE + 'startArrow=diamond;startFill=0;startSize=20;endArrow=none;endFill=0;dashed=0;';
+		}
+
+		if (kind === 'association') {
+			return REF_EDGE + 'startArrow=none;startFill=0;endArrow=open;endFill=0;endSize=14;dashed=0;';
+		}
+
+		if (kind === 'usage') {
+			return REF_EDGE + 'startArrow=none;startFill=0;endArrow=open;endFill=0;endSize=14;dashed=1;';
+		}
+
+		return REF_EDGE + 'startArrow=diamond;startFill=1;startSize=20;endArrow=none;endFill=0;dashed=0;';
+	}
+
+	function isRefEdge(edge) {
+		var value = edge != null ? edge.value : null;
+
+		return value != null && value.nodeType === 1 && typeof value.getAttribute === 'function' &&
+			value.getAttribute('csharpRef') === '1';
+	}
+
+	function refEdges(graph) {
+		var cells = graph.getChildCells(graph.getDefaultParent()) || [];
+		var edges = [];
+
+		for (var i = 0; i < cells.length; i++) {
+			if (graph.getModel().isEdge(cells[i]) && isRefEdge(cells[i])) {
+				edges.push(cells[i]);
+			}
+		}
+
+		return edges;
+	}
+
+	function refValue(owner, memberKey, ref) {
+		var obj = mxUtils.createXmlDocument().createElement('object');
+		obj.setAttribute('label', '');
+		obj.setAttribute('csharpRef', '1');
+		obj.setAttribute('ownerId', owner.id);
+		obj.setAttribute('memberKey', memberKey);
+		obj.setAttribute('targetName', normalizeTypeName(ref.name));
+		obj.setAttribute('refKind', ref.kind);
+		obj.setAttribute('refExplicit', ref.explicit ? '1' : '0');
+		return obj;
+	}
+
+	function rememberRef(graph, edge, ref) {
+		var value = edge.value;
+
+		if (value == null || value.nodeType !== 1) {
+			return;
+		}
+
+		value.setAttribute('targetName', normalizeTypeName(ref.name));
+		value.setAttribute('refKind', ref.kind);
+		value.setAttribute('refExplicit', ref.explicit ? '1' : '0');
+		graph.getModel().setValue(edge, value);
+	}
+
+	function refCodeChanged(edge, ref) {
+		var value = edge.value;
+		return value.getAttribute('refKind') !== ref.kind ||
+			(value.getAttribute('refExplicit') === '1') !== !!ref.explicit;
+	}
+
+	function isDiamondArrow(arrow) {
+		return arrow === 'diamondThin' || arrow === 'diamond';
+	}
+
+	function refKindFromStyle(style) {
+		var start = styleValue(style, 'startArrow');
+		var end = styleValue(style, 'endArrow');
+
+		if (isDiamondArrow(start)) {
+			return styleValue(style, 'startFill') === '0' ? 'aggregation' : 'composition';
+		}
+
+		if (isDiamondArrow(end)) {
+			return styleValue(style, 'endFill') === '0' ? 'aggregation' : 'composition';
+		}
+
+		if ((end && end !== 'none') || (start && start !== 'none')) {
+			return 'association';
+		}
+
+		return null;
+	}
+
+	function applyRefStyle(graph, edge, kind, forceKind) {
+		var model = graph.getModel();
+		var style = model.getStyle(edge) || '';
+		var keepArrows = !forceKind && refKindFromStyle(style) != null;
+		var saved = {};
+		var keys = REF_POINT_KEYS.concat(keepArrows ? REF_ARROW_KEYS : []);
+
+		for (var i = 0; i < keys.length; i++) {
+			saved[keys[i]] = styleValue(style, keys[i]);
+		}
+
+		var next = keepArrows ? style : refStyle(kind);
+
+		next = setStyleValue(next, 'edgeStyle', 'orthogonalEdgeStyle');
+		next = setStyleValue(next, 'rounded', '0');
+		next = setStyleValue(next, 'orthogonalLoop', '1');
+		next = setStyleValue(next, 'jettySize', 'auto');
+		next = setStyleValue(next, 'html', '1');
+
+		for (var p = 0; p < REF_POINT_KEYS.length; p++) {
+			if (saved[REF_POINT_KEYS[p]] != null) {
+				next = setStyleValue(next, REF_POINT_KEYS[p], saved[REF_POINT_KEYS[p]]);
+			}
+		}
+
+		if (keepArrows) {
+			for (var a = 0; a < REF_ARROW_KEYS.length; a++) {
+				if (saved[REF_ARROW_KEYS[a]] != null) {
+					next = setStyleValue(next, REF_ARROW_KEYS[a], saved[REF_ARROW_KEYS[a]]);
+				}
+			}
+		}
+
+		if (styleValue(next, 'startArrow') === 'diamondThin') {
+			next = setStyleValue(next, 'startArrow', 'diamond');
+		}
+
+		if (styleValue(next, 'endArrow') === 'diamondThin') {
+			next = setStyleValue(next, 'endArrow', 'diamond');
+		}
+
+		model.setStyle(edge, next);
+	}
+
+	function findRow(graph, cell, key) {
+		var kids = childVertices(graph, cell);
+
+		for (var i = 0; i < kids.length; i++) {
+			if (rowKey(graph.getModel().getValue(kids[i])) === key) {
+				return kids[i];
+			}
+		}
+
+		return null;
+	}
+
+	function foreignTerminal(graph, edge, row, target) {
+		var model = graph.getModel();
+		var ends = [model.getTerminal(edge, false), model.getTerminal(edge, true)];
+
+		for (var i = 0; i < ends.length; i++) {
+			var end = ends[i];
+
+			if (end == null || end === row) {
+				continue;
+			}
+
+			if (end === target || classOwner(graph, end) === target) {
+				return end;
+			}
+		}
+
+		return target;
+	}
+
+	function memberRefList(parsed) {
+		var list = [];
+
+		if (parsed == null) {
+			return list;
+		}
+
+		var members = (parsed.attributes || []).concat(parsed.operations || []);
+
+		for (var i = 0; i < members.length; i++) {
+			var member = members[i];
+			var key = rowKey(member.text);
+			var refs = member.refs || [];
+
+			for (var r = 0; r < refs.length; r++) {
+				var ref = refs[r];
+				var found = null;
+
+				for (var existing = 0; existing < list.length; existing++) {
+					if (list[existing].key === key && sameRefName(list[existing].name, ref.name)) {
+						found = list[existing];
+						break;
+					}
+				}
+
+				if (found != null) {
+					if (ref.explicit) {
+						found.kind = ref.kind;
+						found.explicit = true;
+						found.name = ref.name;
+					}
+				} else {
+					list.push({
+						key: key,
+						name: ref.name,
+						kind: ref.kind,
+						explicit: !!ref.explicit
+					});
+				}
+			}
+		}
+
+		return list;
+	}
+
+	function syncRefs(graph, cell, parsed, index) {
+		var wanted = memberRefList(parsed);
+		var edges = refEdges(graph);
+		var keep = {};
+
+		for (var i = 0; i < wanted.length; i++) {
+			var ref = wanted[i];
+			var target = lookupClass(index, ref.name);
+
+			if (target == null) {
+				continue;
+			}
+
+			var row = findRow(graph, cell, ref.key);
+
+			if (row == null) {
+				continue;
+			}
+
+			var found = null;
+
+			for (var e = 0; e < edges.length; e++) {
+				var edge = edges[e];
+				var value = edge.value;
+
+				if (value.getAttribute('ownerId') !== cell.id || value.getAttribute('memberKey') !== ref.key) {
+					continue;
+				}
+
+				if (!sameRefName(value.getAttribute('targetName'), ref.name)) {
+					continue;
+				}
+
+				found = edge;
+				break;
+			}
+
+			if (found != null) {
+				keep[found.id] = true;
+				var model = graph.getModel();
+				var foreign = foreignTerminal(graph, found, row, target);
+
+				if (model.getTerminal(found, true) !== row) {
+					model.setTerminal(found, row, true);
+				}
+
+				if (model.getTerminal(found, false) !== foreign) {
+					model.setTerminal(found, foreign, false);
+				}
+
+				applyRefStyle(graph, found, ref.kind, refCodeChanged(found, ref));
+				alignMemberHeight(graph, found, true);
+
+				if (foreign !== target && foreign !== row) {
+					alignMemberHeight(graph, found, model.getTerminal(found, true) === foreign);
+				}
+
+				rememberRef(graph, found, ref);
+				continue;
+			}
+
+			var created = graph.insertEdge(
+				graph.getDefaultParent(),
+				null,
+				refValue(cell, ref.key, ref),
+				row,
+				target,
+				refStyle(ref.kind)
+			);
+			keep[created.id] = true;
+		}
+
+		for (var r = 0; r < edges.length; r++) {
+			var old = edges[r];
+
+			if (old.value.getAttribute('ownerId') === cell.id && !keep[old.id]) {
+				graph.removeCells([old], false);
+			}
+		}
+	}
+
+	function syncAllRefs(graph) {
+		var index = indexClasses(graph);
+		var cells = childVertices(graph, graph.getDefaultParent());
+
+		for (var i = 0; i < cells.length; i++) {
+			if (getPseudo(cells[i]) === '') {
+				continue;
+			}
+
+			syncRefs(graph, cells[i], modelForCell(cells[i]), index);
+		}
+	}
+
+	function restoreRowEdges(graph, cell, parked) {
+		var model = graph.getModel();
+		var kids = childVertices(graph, cell);
+
+		for (var i = 0; i < parked.length; i++) {
+			var item = parked[i];
+			var match = null;
+
+			if (item.key) {
+				for (var k = 0; k < kids.length; k++) {
+					if (rowKey(model.getValue(kids[k])) === item.key) {
+						match = kids[k];
+						break;
+					}
+				}
+			}
+
+			if (match == null) {
+				match = cell;
+			}
+
+			if (item.asSource) {
+				model.setTerminal(item.edge, match, true);
+			}
+
+			if (item.asTarget) {
+				model.setTerminal(item.edge, match, false);
+			}
+
+			if (item.geometry != null) {
+				model.setGeometry(item.edge, item.geometry);
+			}
+
+			if (item.style != null) {
+				model.setStyle(item.edge, item.style);
+			}
+
+			if (match !== cell) {
+				if (item.asSource) {
+					alignMemberHeight(graph, item.edge, true);
+				}
+
+				if (item.asTarget) {
+					alignMemberHeight(graph, item.edge, false);
+				}
+			}
+		}
+	}
+
+	function alignMemberHeight(graph, edge, asSource) {
+		var model = graph.getModel();
+		var style = model.getStyle(edge) || '';
+		var xKey = asSource ? 'exitX' : 'entryX';
+		var yKey = asSource ? 'exitY' : 'entryY';
+		var dyKey = asSource ? 'exitDy' : 'entryDy';
+		var x = parseFloat(styleValue(style, xKey));
+		var y = parseFloat(styleValue(style, yKey));
+		var onSide = !isNaN(x) && (x <= 0.05 || x >= 0.95);
+		var onEnd = !isNaN(y) && (y <= 0.05 || y >= 0.95);
+
+		if (!onSide || onEnd) {
+			return;
+		}
+
+		style = setStyleValue(style, yKey, '0.5');
+		style = setStyleValue(style, dyKey, '0');
+		model.setStyle(edge, style);
+
+		if (edge.geometry == null || edge.geometry.points == null) {
+			return;
+		}
+
+		var geo = edge.geometry.clone();
+		geo.points = null;
+		model.setGeometry(edge, geo);
+	}
+
+	function alignIncomingSides(graph, cell) {
+		var model = graph.getModel();
+		var edges = graph.getConnections(cell) || [];
+
+		for (var i = 0; i < edges.length; i++) {
+			var edge = edges[i];
+
+			if (model.getTerminal(edge, true) === cell) {
+				alignClassSide(graph, edge, cell, true);
+			}
+
+			if (model.getTerminal(edge, false) === cell) {
+				alignClassSide(graph, edge, cell, false);
+			}
+		}
+	}
+
+	function alignClassSide(graph, edge, cell, asSource) {
+		var model = graph.getModel();
+		var style = model.getStyle(edge) || '';
+		var xKey = asSource ? 'exitX' : 'entryX';
+		var yKey = asSource ? 'exitY' : 'entryY';
+		var dyKey = asSource ? 'exitDy' : 'entryDy';
+		var x = parseFloat(styleValue(style, xKey));
+		var y = parseFloat(styleValue(style, yKey));
+		var dy = parseFloat(styleValue(style, dyKey));
+		var onSide = !isNaN(x) && (x <= 0.05 || x >= 0.95);
+		var onEnd = !isNaN(y) && (y <= 0.05 || y >= 0.95);
+
+		if (!onSide || onEnd || cell.geometry == null) {
+			return;
+		}
+
+		y = headerFraction(cell);
+		dy = 0;
+		style = setStyleValue(style, yKey, String(y));
+		style = setStyleValue(style, dyKey, '0');
+		model.setStyle(edge, style);
+
+		var targetY = anchorY(cell, edge, y, dy);
+		var points = retargetEndY(edge.geometry, asSource, targetY);
+
+		if (points == null) {
+			return;
+		}
+
+		var geo = edge.geometry.clone();
+		geo.points = points;
+		model.setGeometry(edge, geo);
+	}
+
+	function headerFraction(cell) {
+		var start = parseFloat(styleValue(cell.style || '', 'startSize'));
+		var height = cell.geometry.height || 0;
+
+		if (isNaN(start) || start <= 0) {
+			start = 26;
+		}
+
+		if (height <= 0) {
+			return 0.5;
+		}
+
+		return (start / 2) / height;
+	}
+
+	function anchorY(cell, edge, fraction, dy) {
+		var local = (cell.geometry.y || 0) + (cell.geometry.height || 0) * fraction + dy;
+		var current = cell.parent;
+		var guard = 0;
+
+		while (current != null && current !== edge.parent && guard < 30) {
+			if (current.geometry != null && current.geometry.relative !== true) {
+				local += current.geometry.y || 0;
+			}
+
+			current = current.parent;
+			guard++;
+		}
+
+		return local;
+	}
+
+	function makePoint(x, y) {
+		if (typeof mxPoint === 'function') {
+			return new mxPoint(x, y);
+		}
+
+		return { x: x, y: y };
+	}
+
+	function retargetEndY(geometry, asSource, newY) {
+		var src = geometry != null ? geometry.points : null;
+
+		if (src == null || !src.length) {
+			return null;
+		}
+
+		var points = [];
+
+		for (var i = 0; i < src.length; i++) {
+			var pt = src[i];
+			points.push(pt.clone ? pt.clone() : makePoint(pt.x, pt.y));
+		}
+
+		var index = asSource ? 0 : points.length - 1;
+		var oldY = points[index].y;
+
+		if (Math.abs(oldY - newY) < 0.5) {
+			return null;
+		}
+
+		var neighbor = asSource ? index + 1 : index - 1;
+		points[index].y = newY;
+
+		if (neighbor >= 0 && neighbor < points.length && Math.abs(points[neighbor].y - oldY) <= 0.5 && Math.abs(points[neighbor].x - points[index].x) >= 0.5) {
+			var corner = makePoint(points[index].x, oldY);
+
+			if (asSource) {
+				points.splice(index + 1, 0, corner);
+			} else {
+				points.splice(index, 0, corner);
+			}
+		}
+
+		return points;
+	}
+
+	function fillCompartments(graph, cell, model, width) {
+		if (model.attributes.length) {
+			for (var i = 0; i < model.attributes.length; i++) {
+				addRow(graph, cell, model.attributes[i], width);
+			}
+		} else if (model.kind === 'enum') {
+			addRow(graph, cell, { text: '', fontStyle: 0 }, width);
+		}
+
+		if (model.kind === 'enum') {
+			return;
 		}
 
 		var divider = graph.insertVertex(cell, null, '', 0, 0, width, 8, DIVIDER_STYLE);
 		divider.setConnectable(false);
 
-		for (var j = 0; j < operations.length; j++) {
-			addRow(graph, cell, operations[j], width);
+		for (var j = 0; j < model.operations.length; j++) {
+			addRow(graph, cell, model.operations[j], width);
 		}
 	}
 
@@ -386,7 +1523,7 @@
 		});
 		lines.push(model.name);
 		model.attributes.concat(model.operations).forEach(function (member) {
-			lines.push(member.text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
+			lines.push(visibleText(member.text));
 		});
 
 		var longest = 0;
@@ -396,13 +1533,14 @@
 		}
 
 		var lineCount = model.stereotypes.length + 1;
+		var attributeRows = model.kind === 'enum' ? Math.max(model.attributes.length, 1) : model.attributes.length;
+		var methodHeight = model.kind === 'enum' ? 0 : 8 + model.operations.length * 26;
 
 		return {
 			width: Math.max(180, Math.min(520, Math.ceil(longest * 7.4 + 32))),
 			height: Math.max(26, 8 + lineCount * 18) +
-				Math.max(model.attributes.length, 1) * 26 +
-				8 +
-				Math.max(model.operations.length, 1) * 26,
+				attributeRows * 26 +
+				methodHeight,
 			startSize: Math.max(26, 8 + lineCount * 18)
 		};
 	}
@@ -430,42 +1568,20 @@
 	}
 
 	function parseDocument(src) {
-		var lines = stripComments(String(src || '')).split(/\r?\n/);
+		var lines = stripBlockComments(String(src || '')).split(/\r?\n/);
 		var classes = [];
 		var current = null;
+		var skipDepth = 0;
+		var propertyDepth = 0;
+		var propertyAccessors = blankAccessors();
+		var propertyMember = null;
+		var pendingBody = null;
+		var pendingMember = null;
+		var expectClassBrace = false;
+		var bodyMember = null;
+		var bodyChunks = [];
 
-		for (var i = 0; i < lines.length; i++) {
-			var line = cleanLine(lines[i]);
-
-			if (!line || line === '{' || line === '}' || line === ';') {
-				continue;
-			}
-
-			if (/^(using|namespace)\b/i.test(line) || /^\[[^\]]*\]$/.test(line)) {
-				continue;
-			}
-
-			var header = parseHeader(line);
-
-			if (header != null) {
-				if (current != null) {
-					classes.push(current);
-				}
-
-				current = header;
-				continue;
-			}
-
-			if (current == null) {
-				continue;
-			}
-
-			var member = parseMember(line, current);
-
-			if (member == null) {
-				continue;
-			}
-
+		function pushMember(member) {
 			if (member.kind === 'operation') {
 				current.operations.push(member);
 			} else {
@@ -473,24 +1589,551 @@
 			}
 		}
 
-		if (current != null) {
-			classes.push(current);
+		function rememberBody(member, text) {
+			if (!member || !text) {
+				return;
+			}
+
+			var own = current ? [current.name, current.simpleName] : [];
+			bodyUses(text).forEach(function (name) {
+				if (namesConnected(own, name)) {
+					return;
+				}
+
+				member.bodyUses = member.bodyUses || [];
+
+				if (!namesConnected(member.bodyUses, name)) {
+					member.bodyUses.push(name);
+				}
+			});
 		}
 
+		function finishBody() {
+			if (bodyMember) {
+				rememberBody(bodyMember, bodyChunks.join('\n'));
+			}
+
+			bodyMember = null;
+			bodyChunks = [];
+		}
+
+		function finishClass() {
+			finishBody();
+
+			if (propertyDepth > 0 && propertyMember) {
+				ensureReadOnly(propertyMember, propertyAccessors.get && !propertyAccessors.set);
+			}
+
+			if (current != null) {
+				finalizeClassRefs(current);
+				classes.push(current);
+				current = null;
+			}
+		}
+
+		for (var i = 0; i < lines.length; i++) {
+			var split = takeLineComment(lines[i]);
+			var code = String(split.code || '').trim();
+
+			if (skipDepth > 0) {
+				if (code) {
+					if (bodyMember) {
+						bodyChunks.push(code);
+					}
+
+					skipDepth = inspectBlock(code, skipDepth).depth;
+				}
+
+				if (skipDepth === 0) {
+					finishBody();
+				}
+				continue;
+			}
+
+			if (propertyDepth > 0) {
+				if (code) {
+					var walked = inspectBlock(code, propertyDepth);
+					propertyAccessors.get = propertyAccessors.get || walked.accessors.get;
+					propertyAccessors.set = propertyAccessors.set || walked.accessors.set;
+					propertyDepth = walked.depth;
+				}
+
+				if (propertyDepth === 0 && propertyMember) {
+					ensureReadOnly(propertyMember, propertyAccessors.get && !propertyAccessors.set);
+					propertyMember = null;
+				}
+				continue;
+			}
+
+			if (!code || code === ';') {
+				continue;
+			}
+
+			if (expectClassBrace && code.charAt(0) === '{') {
+				expectClassBrace = false;
+				code = code.slice(1).trim();
+
+				if (!code || code === '}') {
+					continue;
+				}
+			} else if (expectClassBrace && code !== '}') {
+				expectClassBrace = false;
+			}
+
+			if (pendingBody && code.charAt(0) === '{') {
+				var opened = inspectBlock(code, 0);
+
+				if (pendingBody === 'method') {
+					skipDepth = opened.depth;
+					bodyMember = pendingMember;
+					bodyChunks = code === '{' ? [] : [code];
+					pendingBody = null;
+					pendingMember = null;
+					propertyMember = null;
+
+					if (skipDepth === 0) {
+						finishBody();
+					}
+				} else {
+					propertyAccessors = opened.accessors;
+					propertyDepth = opened.depth;
+					pendingBody = null;
+
+					if (propertyDepth === 0 && propertyMember) {
+						ensureReadOnly(propertyMember, propertyAccessors.get && !propertyAccessors.set);
+						propertyMember = null;
+					}
+				}
+				continue;
+			}
+
+			pendingBody = null;
+			pendingMember = null;
+			propertyMember = null;
+
+			if (code === '{' || code === '}') {
+				continue;
+			}
+
+			if (/^(using|namespace)\b/i.test(code) || /^\[[^\]]*\]$/.test(code)) {
+				continue;
+			}
+
+			var terminated = /;\s*$/.test(code);
+			var headerLine = code.replace(/\{\s*$/, '').trim().replace(/;+\s*$/, '').trim();
+			var header = parseHeader(headerLine);
+
+			if (header != null) {
+				finishClass();
+				skipDepth = 0;
+				propertyDepth = 0;
+				current = header;
+				expectClassBrace = code.indexOf('{') < 0;
+				continue;
+			}
+
+			if (current == null) {
+				continue;
+			}
+
+			var cleaned = cleanLine(code);
+			var separated = separateBody(cleaned);
+			var member = parseMember(separated.signature, current, split.comment);
+
+			if (separated.kind === 'method') {
+				if (member) {
+					pushMember(member);
+
+					if (separated.unclosed > 0) {
+						bodyMember = member;
+						bodyChunks = separated.body ? [separated.body] : [];
+						skipDepth = separated.unclosed;
+					} else {
+						rememberBody(member, separated.body || '');
+					}
+				} else {
+					skipDepth = separated.unclosed;
+				}
+				continue;
+			}
+
+			if (separated.kind === 'property') {
+				if (member) {
+					pushMember(member);
+					propertyAccessors = separated.accessors;
+					propertyDepth = separated.unclosed;
+
+					if (propertyDepth === 0) {
+						ensureReadOnly(member, propertyAccessors.get && !propertyAccessors.set);
+					} else {
+						propertyMember = member;
+					}
+				}
+				continue;
+			}
+
+			if (member == null) {
+				continue;
+			}
+
+			pushMember(member);
+
+			if (!terminated && code.indexOf('{') < 0 && !hasExpressionBody(code)) {
+				pendingBody = member.kind === 'operation' ? 'method' : 'property';
+				propertyMember = pendingBody === 'property' ? member : null;
+				pendingMember = pendingBody === 'method' ? member : null;
+			}
+		}
+
+		finishClass();
 		return classes;
 	}
 
-	function stripComments(src) {
-		return src
-			.replace(/\/\*[\s\S]*?\*\//g, '')
-			.replace(/\/\/[^\n]*/g, '');
+	function blankAccessors() {
+		return { get: false, set: false };
+	}
+
+	function orAccessors(left, right) {
+		return {
+			get: !!(left && left.get) || !!(right && right.get),
+			set: !!(left && left.set) || !!(right && right.set)
+		};
+	}
+
+	function ensureReadOnly(member, getOnly) {
+		if (!member || !getOnly || member.text.indexOf('{readOnly}') >= 0) {
+			return;
+		}
+
+		var commentAt = member.text.indexOf(' <font');
+
+		if (commentAt >= 0) {
+			member.text = member.text.slice(0, commentAt) + ' {readOnly}' + member.text.slice(commentAt);
+		} else {
+			member.text += ' {readOnly}';
+		}
+	}
+
+	function hasExpressionBody(line) {
+		var quote = '';
+
+		for (var i = 0; i < line.length - 1; i++) {
+			var ch = line.charAt(i);
+
+			if (quote) {
+				if (ch === '\\') {
+					i++;
+				} else if (ch === quote) {
+					quote = '';
+				}
+				continue;
+			}
+
+			if (ch === '"' || ch === '\'') {
+				quote = ch;
+				continue;
+			}
+
+			if (ch === '=' && line.charAt(i + 1) === '>') {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	function readBlock(line, openIndex) {
+		var depth = 0;
+		var quote = '';
+
+		for (var i = openIndex; i < line.length; i++) {
+			var ch = line.charAt(i);
+
+			if (quote) {
+				if (ch === '\\') {
+					i++;
+				} else if (ch === quote) {
+					quote = '';
+				}
+				continue;
+			}
+
+			if (ch === '"' || ch === '\'') {
+				quote = ch;
+				continue;
+			}
+
+			if (ch === '{') {
+				depth++;
+			} else if (ch === '}') {
+				depth--;
+
+				if (depth === 0) {
+					return {
+						closed: true,
+						end: i + 1,
+						inner: line.slice(openIndex + 1, i),
+						net: 0
+					};
+				}
+			}
+		}
+
+		return {
+			closed: false,
+			end: line.length,
+			inner: line.slice(openIndex + 1),
+			net: depth
+		};
+	}
+
+	function inspectBlock(text, startDepth) {
+		var depth = startDepth;
+		var quote = '';
+		var buf = '';
+		var accessors = blankAccessors();
+
+		function flush() {
+			if (depth !== 1) {
+				buf = '';
+				return;
+			}
+
+			var match = buf.trim().replace(/^(public|private|protected|internal)\s+/i, '').match(/^(get|set|init)\b/i);
+
+			if (match) {
+				if (match[1].toLowerCase() === 'get') {
+					accessors.get = true;
+				} else {
+					accessors.set = true;
+				}
+			}
+
+			buf = '';
+		}
+
+		for (var i = 0; i < text.length; i++) {
+			var ch = text.charAt(i);
+
+			if (quote) {
+				if (ch === '\\') {
+					i++;
+				} else if (ch === quote) {
+					quote = '';
+				}
+				continue;
+			}
+
+			if (ch === '"' || ch === '\'') {
+				quote = ch;
+				continue;
+			}
+
+			if (ch === '{') {
+				flush();
+				depth++;
+			} else if (ch === '}') {
+				flush();
+				depth = Math.max(0, depth - 1);
+			} else if (depth === 1) {
+				if (ch === ';') {
+					flush();
+				} else {
+					buf += ch;
+				}
+			}
+		}
+
+		flush();
+		return { depth: depth, accessors: accessors };
+	}
+
+	function separateBody(line) {
+		var quote = '';
+		var paren = 0;
+		var sawParen = false;
+
+		for (var i = 0; i < line.length; i++) {
+			var ch = line.charAt(i);
+
+			if (quote) {
+				if (ch === '\\') {
+					i++;
+				} else if (ch === quote) {
+					quote = '';
+				}
+				continue;
+			}
+
+			if (ch === '"' || ch === '\'') {
+				quote = ch;
+				continue;
+			}
+
+			if (ch === '(') {
+				paren++;
+				sawParen = true;
+				continue;
+			}
+
+			if (ch === ')') {
+				paren = Math.max(0, paren - 1);
+				continue;
+			}
+
+			if (ch !== '{' || paren !== 0) {
+				continue;
+			}
+
+			var block = readBlock(line, i);
+
+			if (!block.closed) {
+				var opened = line.slice(0, i).trim();
+
+				if (sawParen) {
+					return { signature: opened, kind: 'method', unclosed: block.net, body: block.inner, accessors: blankAccessors() };
+				}
+
+				var scannedOpen = inspectBlock(line.slice(i), 0);
+				return {
+					signature: opened,
+					kind: 'property',
+					unclosed: scannedOpen.depth,
+					accessors: scannedOpen.accessors
+				};
+			}
+
+			var nested = block.inner.indexOf('{') >= 0;
+			var classified = nested ? { kind: 'body' } : classifyBrace(block.inner);
+
+			if (!nested && (classified.kind === 'suffix' || classified.kind === 'accessor')) {
+				i = block.end - 1;
+				continue;
+			}
+
+			var beforeText = line.slice(0, i);
+			var afterSplit = separateBody(line.slice(block.end));
+
+			if (sawParen) {
+				return {
+					signature: (beforeText + ' ' + afterSplit.signature).trim(),
+					kind: 'method',
+					unclosed: afterSplit.unclosed,
+					body: block.inner + (afterSplit.body || ''),
+					accessors: afterSplit.accessors
+				};
+			}
+
+			var scanned = inspectBlock(block.inner, 1);
+			return {
+				signature: (beforeText + ' ' + afterSplit.signature).trim(),
+				kind: afterSplit.kind === 'method' ? 'method' : 'property',
+				unclosed: afterSplit.unclosed,
+				accessors: orAccessors(scanned.accessors, afterSplit.accessors)
+			};
+		}
+
+		return { signature: String(line || '').trim(), kind: null, unclosed: 0, accessors: blankAccessors() };
+	}
+
+	function stripBlockComments(src) {
+		return src.replace(/\/\*[\s\S]*?\*\//g, '');
+	}
+
+	function takeLineComment(raw) {
+		var line = String(raw || '');
+		var quote = '';
+
+		for (var i = 0; i < line.length - 1; i++) {
+			var ch = line.charAt(i);
+
+			if (quote) {
+				if (ch === '\\') {
+					i++;
+				} else if (ch === quote) {
+					quote = '';
+				}
+
+				continue;
+			}
+
+			if (ch === '"' || ch === '\'') {
+				quote = ch;
+				continue;
+			}
+
+			if (ch === '/' && line.charAt(i + 1) === '/') {
+				return {
+					code: line.slice(0, i),
+					comment: line.slice(i).trim()
+				};
+			}
+		}
+
+		return { code: line, comment: '' };
+	}
+
+	function formatComment(comment) {
+		if (!comment) {
+			return '';
+		}
+
+		return ' <font color="#008000">' + escapeHtml(comment) + '</font>';
+	}
+
+	function visibleText(value) {
+		return String(value)
+			.replace(/<[^>]*>/g, '')
+			.replace(/&nbsp;/g, ' ')
+			.replace(/&lt;/g, '<')
+			.replace(/&gt;/g, '>')
+			.replace(/&amp;/g, '&');
 	}
 
 	function cleanLine(raw) {
 		var line = String(raw || '').trim();
-		line = line.replace(/\{\s*$/, '').trim();
 		line = line.replace(/;+\s*$/, '').trim();
 		return line;
+	}
+
+	function stripStatementSemicolons(text) {
+		var quote = '';
+		var depth = 0;
+		var out = '';
+
+		for (var i = 0; i < text.length; i++) {
+			var ch = text.charAt(i);
+
+			if (quote) {
+				out += ch;
+
+				if (ch === '\\' && i + 1 < text.length) {
+					out += text.charAt(++i);
+				} else if (ch === quote) {
+					quote = '';
+				}
+
+				continue;
+			}
+
+			if (ch === '"' || ch === '\'') {
+				quote = ch;
+				out += ch;
+				continue;
+			}
+
+			if (ch === '(' || ch === '[' || ch === '{') {
+				depth++;
+			} else if (ch === ')' || ch === ']' || ch === '}') {
+				depth = Math.max(0, depth - 1);
+			} else if (ch === ';' && depth === 0) {
+				continue;
+			}
+
+			out += ch;
+		}
+
+		return out.replace(/[ \t]{2,}/g, ' ').trim();
 	}
 
 	function parseHeader(line) {
@@ -535,6 +2178,10 @@
 			pushStereotype(stereotypes, 'enum');
 		}
 
+		if (kind === 'struct') {
+			pushStereotype(stereotypes, 'struct');
+		}
+
 		if (modifiers.indexOf('abstract') >= 0) {
 			pushStereotype(stereotypes, 'abstract');
 		}
@@ -552,12 +2199,28 @@
 			kind: kind,
 			name: name,
 			simpleName: match[2],
+			bases: parseBases(match[4]),
 			stereotypes: stereotypes,
 			italic: italic,
-			defaultVisibility: (kind === 'interface' || kind === 'enum') ? '+' : '-',
+			defaultVisibility: kind === 'interface' ? '+' : (kind === 'enum' ? '' : '-'),
 			attributes: [],
 			operations: []
 		};
+	}
+
+	function parseBases(tail) {
+		var text = String(tail || '').replace(/<<\s*[^<>]+?\s*>>/g, ' ');
+		var colon = text.indexOf(':');
+
+		if (colon < 0) {
+			return [];
+		}
+
+		return splitTopLevel(text.slice(colon + 1)).map(function (part) {
+			return part.trim();
+		}).filter(function (part) {
+			return /^[A-Za-z_]/.test(part);
+		});
 	}
 
 	function pushStereotype(list, name) {
@@ -581,7 +2244,404 @@
 		list.push(name);
 	}
 
-	function parseMember(line, typeModel) {
+	function stripArrays(text) {
+		return String(text || '').trim().replace(/(\[\s*\]|\?)+$/g, '').trim();
+	}
+
+	function extractRefs(line) {
+		var refs = [];
+		var quote = '';
+		var out = '';
+
+		for (var i = 0; i < line.length; i++) {
+			var ch = line.charAt(i);
+
+			if (quote) {
+				out += ch;
+
+				if (ch === '\\' && i + 1 < line.length) {
+					out += line.charAt(++i);
+				} else if (ch === quote) {
+					quote = '';
+				}
+
+				continue;
+			}
+
+			if (ch === '"' || ch === '\'') {
+				quote = ch;
+				out += ch;
+				continue;
+			}
+
+			if (ch === '\u00A7') {
+				var parsed = readRefMarker(line, i + 1);
+
+				if (parsed != null) {
+					refs.push(parsed.ref);
+					i = parsed.end - 1;
+					continue;
+				}
+			}
+
+			out += ch;
+		}
+
+		return {
+			text: out.replace(/[ \t]{2,}/g, ' ').trim(),
+			refs: refs
+		};
+	}
+
+	function readRefMarker(line, start) {
+		var i = start;
+
+		while (i < line.length && /\s/.test(line.charAt(i))) {
+			i++;
+		}
+
+		var kind = 'association';
+		var kindMatch = /^(association|aggregation|composition|assoc|agg|comp)\b/i.exec(line.slice(i));
+
+		if (kindMatch) {
+			var j = i + kindMatch[0].length;
+
+			while (j < line.length && /\s/.test(line.charAt(j))) {
+				j++;
+			}
+
+			if (line.charAt(j) === ':') {
+				kind = REF_KIND[kindMatch[1].toLowerCase()];
+				i = j + 1;
+			} else {
+				return {
+					end: i + kindMatch[0].length,
+					ref: {
+						name: '',
+						kind: REF_KIND[kindMatch[1].toLowerCase()],
+						explicit: true,
+						contextual: true
+					}
+				};
+			}
+		}
+
+		while (i < line.length && /\s/.test(line.charAt(i))) {
+			i++;
+		}
+
+		var type = readTypeToken(line, i);
+
+		if (type == null) {
+			if (kindMatch) {
+				return {
+					end: j + 1,
+					ref: {
+						name: '',
+						kind: kind,
+						explicit: true,
+						contextual: true
+					}
+				};
+			}
+
+			return null;
+		}
+
+		return {
+			end: type.end,
+			ref: {
+				name: stripArrays(type.name).replace(/\s+/g, ''),
+				kind: kind,
+				explicit: true,
+				named: true
+			}
+		};
+	}
+
+	function readTypeToken(line, start) {
+		var i = start;
+
+		if (!/[A-Za-z_]/.test(line.charAt(i) || '')) {
+			return null;
+		}
+
+		while (i < line.length && /[\w.]/.test(line.charAt(i))) {
+			i++;
+		}
+
+		if (line.charAt(i) === '<') {
+			var depth = 0;
+
+			for (; i < line.length; i++) {
+				var ch = line.charAt(i);
+
+				if (ch === '<') {
+					depth++;
+				} else if (ch === '>') {
+					depth--;
+
+					if (depth === 0) {
+						i++;
+						break;
+					}
+				}
+			}
+		}
+
+		while (line.charAt(i) === '?' || (line.charAt(i) === '[' && line.charAt(i + 1) === ']')) {
+			i += line.charAt(i) === '?' ? 1 : 2;
+		}
+
+		return {
+			name: line.slice(start, i).replace(/\s+/g, ''),
+			end: i
+		};
+	}
+
+	function typeCandidates(type) {
+		var names = [];
+
+		function add(name) {
+			var clean = stripArrays(String(name || '').replace(/\s+/g, ''));
+			var leaf = typeLeaf(clean).toLowerCase();
+
+			if (!/^[A-Za-z_][\w.]*$/.test(clean) || NON_REF[leaf] || names.indexOf(clean) >= 0) {
+				return;
+			}
+
+			names.push(clean);
+		}
+
+		function walk(src) {
+			var text = stripArrays(String(src || '').trim());
+
+			if (!text) {
+				return;
+			}
+
+			var depth = 0;
+			var genericAt = -1;
+
+			for (var i = 0; i < text.length; i++) {
+				var ch = text.charAt(i);
+
+				if (ch === '<') {
+					if (depth === 0) {
+						genericAt = i;
+					}
+
+					depth++;
+				} else if (ch === '>') {
+					depth--;
+				}
+			}
+
+			if (genericAt < 0) {
+				add(text);
+				return;
+			}
+
+			add(text.slice(0, genericAt));
+			var close = text.lastIndexOf('>');
+			var inner = close > genericAt ? text.slice(genericAt + 1, close) : '';
+			splitTopLevel(inner).forEach(walk);
+		}
+
+		walk(type);
+		return names;
+	}
+
+	function mergeRef(refs, ref) {
+		if (ref == null || !ref.name) {
+			return;
+		}
+
+		for (var i = 0; i < refs.length; i++) {
+			if (sameRefName(refs[i].name, ref.name)) {
+				if (ref.explicit) {
+					refs[i].name = ref.name;
+					refs[i].kind = ref.kind;
+					refs[i].explicit = true;
+				}
+
+				if (ref.named) {
+					refs[i].named = true;
+				}
+
+				if (ref.role && !refs[i].role) {
+					refs[i].role = ref.role;
+				}
+
+				return;
+			}
+		}
+
+		refs.push({
+			name: ref.name,
+			kind: ref.kind,
+			explicit: !!ref.explicit,
+			named: !!ref.named,
+			role: ref.role || ''
+		});
+	}
+
+	function attachRefs(member, refs, types, paramTypes) {
+		var named = [];
+		var contextKind = null;
+
+		for (var i = 0; i < (refs || []).length; i++) {
+			if (refs[i].contextual) {
+				contextKind = refs[i].kind;
+			} else if (refs[i].name) {
+				named.push(refs[i]);
+			}
+		}
+
+		var list = [];
+
+		for (var t = 0; t < (types || []).length; t++) {
+			var candidates = typeCandidates(types[t]);
+
+			for (var c = 0; c < candidates.length; c++) {
+				mergeRef(list, {
+					name: candidates[c],
+					kind: contextKind || 'composition',
+					explicit: contextKind != null,
+					role: 'member'
+				});
+			}
+		}
+
+		for (var p = 0; p < (paramTypes || []).length; p++) {
+			var paramCandidates = typeCandidates(paramTypes[p]);
+
+			for (var k = 0; k < paramCandidates.length; k++) {
+				mergeRef(list, {
+					name: paramCandidates[k],
+					kind: 'association',
+					explicit: false,
+					role: 'param'
+				});
+			}
+		}
+
+		for (var n = 0; n < named.length; n++) {
+			mergeRef(list, named[n]);
+		}
+
+		member.refs = list;
+		return member;
+	}
+
+	function namesConnected(names, name) {
+		for (var i = 0; i < names.length; i++) {
+			if (sameRefName(names[i], name)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	function finalizeClassRefs(model) {
+		var fields = [];
+
+		(model.attributes || []).forEach(function (attr) {
+			(attr.refs || []).forEach(function (ref) {
+				if (ref.name) {
+					fields.push(ref.name);
+				}
+			});
+		});
+
+		(model.operations || []).forEach(function (op) {
+			var kept = [];
+
+			(op.refs || []).forEach(function (ref) {
+				if (ref.role === 'param' && !ref.named && namesConnected(fields, ref.name)) {
+					return;
+				}
+
+				kept.push(ref);
+			});
+
+			var have = kept.map(function (ref) {
+				return ref.name;
+			});
+
+			(op.bodyUses || []).forEach(function (name) {
+				if (namesConnected(fields, name) || namesConnected(have, name)) {
+					return;
+				}
+
+				kept.push({
+					name: name,
+					kind: 'usage',
+					explicit: false,
+					role: 'body'
+				});
+				have.push(name);
+			});
+
+			op.refs = kept;
+		});
+	}
+
+	function bodyUses(text) {
+		var src = String(text || '')
+			.replace(/"(?:\\.|[^"\\])*"/g, '""')
+			.replace(/'(?:\\.|[^'\\])*'/g, "''");
+		var found = [];
+		var hits = [];
+
+		function collect(re) {
+			var match;
+
+			re.lastIndex = 0;
+
+			while ((match = re.exec(src))) {
+				hits.push({ index: match.index, type: match[1] });
+			}
+		}
+
+		collect(/\bnew\s+([A-Za-z_][\w.]*(?:\s*<[^;{}()]*>)?)/g);
+		collect(/\b(?:is|as)\s+([A-Za-z_][\w.]*(?:\s*<[^;{}()]*>)?)/g);
+		collect(/\(\s*([A-Za-z_][\w.]*(?:\s*<[^;{}()]*>)?(?:\s*\[\s*\])*)\s*\)/g);
+		collect(/(?:^|[{};(,])\s*(?:(?:public|private|protected|internal|static|readonly|const|out|ref)\s+)*([A-Za-z_][\w.]*(?:\s*<[^;{}()]*>)?(?:\s*\[\s*\])*\??)\s+[A-Za-z_]\w*/gm);
+		collect(/\b([A-Z][\w.]*)\s*\./g);
+		hits.sort(function (left, right) {
+			return left.index - right.index;
+		});
+
+		var notType = {
+			new: true, return: true, if: true, else: true, for: true, foreach: true, while: true,
+			do: true, switch: true, case: true, break: true, continue: true, throw: true, try: true,
+			catch: true, finally: true, lock: true, using: true, fixed: true, this: true, base: true,
+			true: true, false: true, null: true, typeof: true, await: true, yield: true, var: true
+		};
+
+		hits.forEach(function (hit) {
+			var head = String(hit.type || '').split(/[.<]/)[0].toLowerCase();
+
+			if (notType[head]) {
+				return;
+			}
+
+			typeCandidates(hit.type).forEach(function (name) {
+				if (found.indexOf(name) < 0) {
+					found.push(name);
+				}
+			});
+		});
+
+		return found;
+	}
+
+	function parseMember(line, typeModel, comment) {
+		var extracted = extractRefs(line);
+		var explicitRefs = extracted.refs;
+		line = stripStatementSemicolons(extracted.text);
 		var peeled = peelBraces(line);
 		var stripped = stripExpression(peeled.text);
 		var mods = consumeModifiers(stripped.text);
@@ -613,43 +2673,52 @@
 			}
 		});
 
-		var visibility = mods.visibility || typeModel.defaultVisibility;
+		var visibility = typeModel.kind === 'enum' ? '' : (mods.visibility || typeModel.defaultVisibility);
 		var fontStyle = (flags.abstract ? 2 : 0) + (flags.static ? 4 : 0);
-		var suffixText = formatSuffixes(peeled.suffixes, flags);
+		var suffixText = escapeHtml(formatSuffixes(peeled.suffixes, flags)) + formatComment(comment);
 
 		if (hasParen(mods.rest)) {
 			var operation = parseOperation(mods.rest, typeModel.simpleName);
 			var shown = operation.isConstructor ? '&lt;&lt;constructor&gt;&gt;' : escapeHtml(operation.name);
-			var text = visibility + ' ' + shown + '(' + operation.params + ')';
+			var text = withVisibility(visibility, shown + '(' + operation.params + ')');
 
 			if (operation.type && !operation.isConstructor) {
 				text += ': ' + escapeHtml(operation.type);
 			}
 
-			return {
+			return attachRefs({
 				kind: 'operation',
-				text: text + escapeHtml(suffixText),
+				text: text + suffixText,
 				fontStyle: fontStyle
-			};
+			}, explicitRefs, operation.type && !operation.isConstructor ? [operation.type] : [], operation.paramTypes);
 		}
 
-		var named = splitTypeAndName(mods.rest);
+		var assigned = splitInitializer(mods.rest);
+		var named = splitTypeAndName(assigned.text);
 
 		if (!named.name) {
 			return null;
 		}
 
-		var field = visibility + ' ' + escapeHtml(named.name);
+		var field = withVisibility(visibility, escapeHtml(named.name));
 
 		if (named.type) {
 			field += ': ' + escapeHtml(named.type);
 		}
 
-		return {
+		if (assigned.value) {
+			field += ' = ' + escapeHtml(assigned.value);
+		}
+
+		return attachRefs({
 			kind: 'attribute',
-			text: field + escapeHtml(suffixText),
+			text: field + suffixText,
 			fontStyle: fontStyle
-		};
+		}, explicitRefs, named.type ? [named.type] : []);
+	}
+
+	function withVisibility(visibility, text) {
+		return visibility ? visibility + ' ' + text : text;
 	}
 
 	function parseOperation(rest, className) {
@@ -659,11 +2728,23 @@
 		var paramsSrc = close > open ? rest.slice(open + 1, close) : rest.slice(open + 1);
 		var named = splitTypeAndName(head);
 
+		var paramTypes = [];
+
+		splitTopLevel(paramsSrc).forEach(function (param) {
+			var value = stripDefault(param).replace(/^(out|ref|in|params|this)\s+/i, '').trim();
+			var paramNamed = splitTypeAndName(value);
+
+			if (paramNamed.type) {
+				paramTypes.push(paramNamed.type);
+			}
+		});
+
 		return {
 			name: named.name,
 			type: named.type,
 			isConstructor: named.name === className,
-			params: splitTopLevel(paramsSrc).map(formatParam).filter(Boolean).join(', ')
+			params: splitTopLevel(paramsSrc).map(formatParam).filter(Boolean).join(', '),
+			paramTypes: paramTypes
 		};
 	}
 
@@ -703,6 +2784,49 @@
 		return out.trim();
 	}
 
+	function splitInitializer(text) {
+		var depth = 0;
+		var quote = '';
+
+		for (var i = 0; i < text.length; i++) {
+			var ch = text.charAt(i);
+
+			if (quote) {
+				if (ch === '\\') {
+					i++;
+				} else if (ch === quote) {
+					quote = '';
+				}
+
+				continue;
+			}
+
+			if (ch === '"' || ch === '\'') {
+				quote = ch;
+				continue;
+			}
+
+			if (ch === '<' || ch === '(' || ch === '[' || ch === '{') {
+				depth++;
+			} else if (ch === '>' || ch === ')' || ch === ']' || ch === '}') {
+				depth = Math.max(0, depth - 1);
+			} else if (depth === 0 && ch === '=' && text.charAt(i + 1) !== '=' && text.charAt(i + 1) !== '>') {
+				var prev = i > 0 ? text.charAt(i - 1) : '';
+
+				if (prev === '!' || prev === '<' || prev === '>') {
+					continue;
+				}
+
+				return {
+					text: text.slice(0, i).trim(),
+					value: text.slice(i + 1).trim()
+				};
+			}
+		}
+
+		return { text: String(text || '').trim(), value: '' };
+	}
+
 	function splitTypeAndName(head) {
 		var text = String(head || '').trim();
 
@@ -720,6 +2844,31 @@
 			type: (match[1] || '').trim(),
 			name: match[2]
 		};
+	}
+
+	function splitDelimiters(src, delimiter) {
+		var parts = [];
+		var depth = 0;
+		var current = '';
+
+		for (var i = 0; i < src.length; i++) {
+			var ch = src.charAt(i);
+
+			if (ch === '<' || ch === '(' || ch === '[' || ch === '{') {
+				depth++;
+			} else if (ch === '>' || ch === ')' || ch === ']' || ch === '}') {
+				depth = Math.max(0, depth - 1);
+			} else if (ch === delimiter && depth === 0) {
+				parts.push(current);
+				current = '';
+				continue;
+			}
+
+			current += ch;
+		}
+
+		parts.push(current);
+		return parts;
 	}
 
 	function splitTopLevel(src) {
@@ -833,25 +2982,33 @@
 			return { kind: 'suffix', name: normalizeSuffix(text) };
 		}
 
-		var words = text.replace(/;/g, ' ').trim().split(/\s+/).filter(Boolean);
-		var filtered = words.filter(function (word) {
-			return !/^(public|private|protected|internal)$/i.test(word);
-		});
+		var clauses = splitDelimiters(text, ';').map(function (clause) {
+			return clause.trim();
+		}).filter(Boolean);
 
-		if (filtered.length && filtered.every(function (word) {
-			return /^(get|set|init)$/i.test(word);
-		})) {
-			return {
-				kind: 'accessor',
-				get: filtered.some(function (word) { return word.toLowerCase() === 'get'; }),
-				set: filtered.some(function (word) {
-					var key = word.toLowerCase();
-					return key === 'set' || key === 'init';
-				})
-			};
+		if (!clauses.length) {
+			return { kind: 'body' };
 		}
 
-		return { kind: 'body' };
+		var sawGet = false;
+		var sawSet = false;
+
+		for (var i = 0; i < clauses.length; i++) {
+			var clause = clauses[i].replace(/^(public|private|protected|internal)\s+/i, '').trim();
+			var accessor = clause.match(/^(get|set|init)\b\s*(=>|\{|$)/i);
+
+			if (accessor == null) {
+				return { kind: 'body' };
+			}
+
+			if (accessor[1].toLowerCase() === 'get') {
+				sawGet = true;
+			} else {
+				sawSet = true;
+			}
+		}
+
+		return { kind: 'accessor', get: sawGet, set: sawSet };
 	}
 
 	function normalizeSuffix(name) {
