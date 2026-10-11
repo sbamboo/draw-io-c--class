@@ -143,9 +143,49 @@
 		}
 
 		addToolbarButton(ui);
+		hookTooltips(ui);
 		window.setTimeout(function () {
 			addToolbarButton(ui);
 		}, 250);
+	}
+
+	function hookTooltips(ui) {
+		var graph = ui.editor != null ? ui.editor.graph : null;
+
+		if (graph == null || graph.getTooltipForCell == null) {
+			return;
+		}
+
+		var base = graph.getTooltipForCell;
+
+		if (base.csharpUmlBase != null) {
+			base = base.csharpUmlBase;
+		}
+
+		var wrapped = function (cell) {
+			var pseudo = getPseudo(cell);
+
+			if (pseudo !== '') {
+				return formatPseudoTooltip(pseudo);
+			}
+
+			return base.apply(this, arguments);
+		};
+
+		wrapped.csharpUmlBase = base;
+		graph.getTooltipForCell = wrapped;
+	}
+
+	function formatPseudoTooltip(source) {
+		var lines = String(source || '').replace(/\t/g, '    ').split(/\r?\n/);
+		var html = '<br>';
+
+		for (var i = 0; i < lines.length; i++) {
+			html += escapeHtml(lines[i]).replace(/ /g, '&nbsp;');
+			html += '<br>';
+		}
+
+		return html;
 	}
 
 	function ensureToolbarButtonStyle() {
@@ -1505,6 +1545,7 @@
 		var obj = mxUtils.createXmlDocument().createElement('object');
 		obj.setAttribute('label', headerLabel(model));
 		obj.setAttribute('pseudo', source);
+		obj.setAttribute('tooltip', formatPseudoTooltip(source));
 		return obj;
 	}
 
