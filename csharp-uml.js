@@ -1625,8 +1625,27 @@
 		function pushMember(member) {
 			if (member.kind === 'operation') {
 				current.operations.push(member);
+			} else if (member.kind === 'property') {
+				current.properties.push(member);
 			} else {
 				current.attributes.push(member);
+			}
+		}
+
+		function placeAsProperty(member) {
+			if (!member || current == null) {
+				return;
+			}
+
+			var index = current.attributes.indexOf(member);
+
+			if (index >= 0) {
+				current.attributes.splice(index, 1);
+			}
+
+			if (current.properties.indexOf(member) < 0) {
+				member.kind = 'property';
+				current.properties.push(member);
 			}
 		}
 
@@ -1666,6 +1685,8 @@
 			}
 
 			if (current != null) {
+				current.operations = (current.properties || []).concat(current.operations || []);
+				current.properties = [];
 				finalizeClassRefs(current);
 				classes.push(current);
 				current = null;
@@ -1736,6 +1757,7 @@
 						finishBody();
 					}
 				} else {
+					placeAsProperty(propertyMember);
 					propertyAccessors = opened.accessors;
 					propertyDepth = opened.depth;
 					pendingBody = null;
@@ -1800,6 +1822,7 @@
 
 			if (separated.kind === 'property') {
 				if (member) {
+					member.kind = 'property';
 					pushMember(member);
 					propertyAccessors = separated.accessors;
 					propertyDepth = separated.unclosed;
@@ -2245,6 +2268,7 @@
 			italic: italic,
 			defaultVisibility: kind === 'interface' ? '+' : (kind === 'enum' ? '' : '-'),
 			attributes: [],
+			properties: [],
 			operations: []
 		};
 	}
@@ -2751,8 +2775,11 @@
 			field += ' = ' + escapeHtml(assigned.value);
 		}
 
+		var isProperty = (stripped.expression && !hasParen(mods.rest)) ||
+			peeled.accessors.get || peeled.accessors.set;
+
 		return attachRefs({
-			kind: 'attribute',
+			kind: isProperty ? 'property' : 'attribute',
 			text: field + suffixText,
 			fontStyle: fontStyle
 		}, explicitRefs, named.type ? [named.type] : []);

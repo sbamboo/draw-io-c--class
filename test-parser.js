@@ -15,10 +15,10 @@ assert.strictEqual(sample[0].name, 'MYClass');
 assert.strictEqual(sample[0].italic, false);
 assert.deepStrictEqual(sample[0].stereotypes, []);
 assert.deepStrictEqual(sample[0].attributes.map(function (m) { return m.text; }), [
-	'- memberVar',
-	'+ Property {readOnly}'
+	'- memberVar'
 ]);
 assert.deepStrictEqual(sample[0].operations.map(function (m) { return m.text; }), [
+	'+ Property {readOnly}',
 	'- MemberMethod(param: string): void',
 	'+ MemberMethodPubl(param: string): void'
 ]);
@@ -40,13 +40,14 @@ var shape = parseDocument([
 
 assert.deepStrictEqual(shape[0].stereotypes, ['abstract', 'entity']);
 assert.strictEqual(shape[0].italic, true);
-assert.strictEqual(shape[0].operations[0].text, '+ Draw(): void {abstract}');
-assert.strictEqual(shape[0].operations[0].fontStyle, 2);
-assert.strictEqual(shape[0].attributes[0].text, '+ Count: int {readOnly}{static}');
-assert.strictEqual(shape[0].attributes[0].fontStyle, 4);
-assert.strictEqual(shape[0].operations[1].text, '+ &lt;&lt;constructor&gt;&gt;(name: string)');
-assert.strictEqual(shape[0].attributes[1].text, '# Id: string');
-assert.strictEqual(shape[0].operations[2].text, '# Hide(): void');
+assert.strictEqual(shape[0].operations[0].text, '+ Count: int {readOnly}{static}');
+assert.strictEqual(shape[0].operations[0].fontStyle, 4);
+assert.strictEqual(shape[0].operations[1].text, '# Id: string');
+assert.strictEqual(shape[0].operations[2].text, '+ Draw(): void {abstract}');
+assert.strictEqual(shape[0].operations[2].fontStyle, 2);
+assert.strictEqual(shape[0].operations[3].text, '+ &lt;&lt;constructor&gt;&gt;(name: string)');
+assert.strictEqual(shape[0].operations[4].text, '# Hide(): void');
+assert.deepStrictEqual(shape[0].attributes, []);
 
 var iface = parseDocument('interface IFoo <<service>>\nvoid Run(int x, Dictionary<string, int> map)');
 assert.deepStrictEqual(iface[0].stereotypes, ['interface', 'service']);
@@ -78,8 +79,8 @@ assert.strictEqual(both[0].operations[0].fontStyle, 6);
 
 var generic = parseDocument('class Bag<T>\npublic Bag(T item)\npublic List<T> Item { get; private set; }');
 assert.strictEqual(generic[0].name, 'Bag<T>');
-assert.strictEqual(generic[0].operations[0].text, '+ &lt;&lt;constructor&gt;&gt;(item: T)');
-assert.strictEqual(generic[0].attributes[0].text, '+ Item: List&lt;T&gt;');
+assert.strictEqual(generic[0].operations[0].text, '+ Item: List&lt;T&gt;');
+assert.strictEqual(generic[0].operations[1].text, '+ &lt;&lt;constructor&gt;&gt;(item: T)');
 
 var initial = parseDocument('class State\npublic bool Dead = false\npublic string Name = "a = b"\nenum Code\nRed = 1');
 assert.strictEqual(initial[0].attributes[0].text, '+ Dead: bool = false');
@@ -98,11 +99,12 @@ var noted = parseDocument([
 	'Green'
 ].join('\n'));
 
-assert.strictEqual(noted[0].attributes[0].text, '+ Width: int <font color="#008000">// wide</font>');
-assert.strictEqual(noted[0].attributes[1].text, '+ Height: int {readOnly} <font color="#008000">// tall</font>');
-assert.strictEqual(noted[0].attributes[2].text, '+ Depth: int {readOnly} <font color="#008000">// only getter</font>');
-assert.strictEqual(noted[0].attributes[3].text, '+ Area: int');
-assert.strictEqual(noted[0].operations[0].text, '- Reset(): void <font color="#008000">// clears</font>');
+assert.strictEqual(noted[0].operations[0].text, '+ Width: int <font color="#008000">// wide</font>');
+assert.strictEqual(noted[0].operations[1].text, '+ Height: int {readOnly} <font color="#008000">// tall</font>');
+assert.strictEqual(noted[0].operations[2].text, '+ Depth: int {readOnly} <font color="#008000">// only getter</font>');
+assert.strictEqual(noted[0].operations[3].text, '+ Area: int');
+assert.strictEqual(noted[0].operations[4].text, '- Reset(): void <font color="#008000">// clears</font>');
+assert.deepStrictEqual(noted[0].attributes, []);
 var derived = parseDocument('class MyClass : ParentClass, IExampleInterface <<entity>>\ninterface IExampleInterface : IOther\nclass Bag<T> : Collection<T>');
 assert.deepStrictEqual(derived[0].bases, ['ParentClass', 'IExampleInterface']);
 assert.deepStrictEqual(derived[0].stereotypes, ['entity']);
@@ -249,16 +251,16 @@ var bodies = parseDocument([
 ].join('\n'));
 
 assert.deepStrictEqual(bodies[0].operations.map(function (member) { return member.text; }), [
+	'+ Width: int',
+	'+ Height: int {readOnly}',
+	'+ Name: string',
+	'+ Area: int {readOnly}',
 	'+ Run(): void',
 	'+ Stop(): void',
 	'- Once(): void',
 	'+ Talk(): void'
 ]);
 assert.deepStrictEqual(bodies[0].attributes.map(function (member) { return member.text; }), [
-	'+ Width: int',
-	'+ Height: int {readOnly}',
-	'+ Name: string',
-	'+ Area: int {readOnly}',
 	'+ After: int'
 ]);
 
