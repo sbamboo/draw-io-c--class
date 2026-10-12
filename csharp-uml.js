@@ -1511,7 +1511,7 @@
 			for (var i = 0; i < model.attributes.length; i++) {
 				addRow(graph, cell, model.attributes[i], width);
 			}
-		} else if (model.kind === 'enum') {
+		} else if (model.kind === 'enum' || model.operations.length) {
 			addRow(graph, cell, { text: '', fontStyle: 0 }, width);
 		}
 
@@ -1574,7 +1574,11 @@
 		}
 
 		var lineCount = model.stereotypes.length + 1;
-		var attributeRows = model.kind === 'enum' ? Math.max(model.attributes.length, 1) : model.attributes.length;
+		var attributeRows = model.attributes.length;
+
+		if (!attributeRows && (model.kind === 'enum' || model.operations.length)) {
+			attributeRows = 1;
+		}
 		var methodHeight = model.kind === 'enum' ? 0 : 8 + model.operations.length * 26;
 
 		return {

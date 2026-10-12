@@ -291,4 +291,17 @@ assert.strictEqual(refText(uses[1].operations[0]), 'usage:Logger');
 assert.strictEqual(noted[1].attributes[0].text, 'Red <font color="#008000">// primary</font>');
 assert.deepStrictEqual(noted[1].operations, []);
 
+var scene = parseDocument([
+	'interface ISceneObject {',
+	'    public FloatRect Bounds => new FloatRect();',
+	'    public void Update(float deltaTime);',
+	'}'
+].join('\n'));
+
+assert.deepStrictEqual(scene[0].attributes, []);
+assert.deepStrictEqual(scene[0].operations.map(function (member) { return member.text; }), [
+	'+ Bounds: FloatRect {readOnly}',
+	'+ Update(deltaTime: float): void'
+]);
+
 console.log('parser ok');
