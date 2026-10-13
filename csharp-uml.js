@@ -669,7 +669,7 @@
 			label = String(value);
 		}
 
-		return visibleText(label).replace(/<<[^<>]+>>/g, ' ').replace(/\s+/g, ' ').trim();
+		return visibleText(label).replace(/<<[^<>]+>>/g, ' ').replace(/\s*\/\/.*$/, '').replace(/\s+/g, ' ').trim();
 	}
 
 	function classOwner(graph, terminal) {
