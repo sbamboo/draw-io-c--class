@@ -595,6 +595,8 @@
 				alignIncomingSides(graph, created[n]);
 			}
 
+			routeAroundClasses(graph);
+
 			graph.setSelectionCells(created);
 		} finally {
 			graph.getModel().endUpdate();
@@ -1554,6 +1556,223 @@
 		}
 
 		return local;
+	}
+
+	function routeAroundClasses(graph) {
+		var classes = [];
+		var cells = childVertices(graph, graph.getDefaultParent());
+
+		for (var i = 0; i < cells.length; i++) {
+			if (getPseudo(cells[i]) !== '' && cells[i].geometry != null) {
+				classes.push(cells[i]);
+			}
+		}
+
+		var edges = inheritEdges(graph).concat(refEdges(graph));
+
+		for (var e = 0; e < edges.length; e++) {
+			routeEdgeAroundClasses(graph, edges[e], classes);
+		}
+	}
+
+	function cellBox(cell) {
+		var geo = cell.geometry;
+
+		return {
+			x: geo.x,
+			y: geo.y,
+			w: geo.width,
+			h: geo.height
+		};
+	}
+
+	function terminalAnchor(graph, edge, asSource) {
+		var model = graph.getModel();
+		var terminal = model.getTerminal(edge, asSource);
+		var owner = classOwner(graph, terminal);
+
+		if (owner == null || owner.geometry == null || getPseudo(owner) === '') {
+			return null;
+		}
+
+		var box = cellBox(owner);
+		var style = model.getStyle(edge) || '';
+		var x = parseFloat(styleValue(style, asSource ? 'exitX' : 'entryX'));
+		var y = parseFloat(styleValue(style, asSource ? 'exitY' : 'entryY'));
+
+		if (isNaN(x)) {
+			x = 0.5;
+		}
+
+		if (isNaN(y)) {
+			y = 0.5;
+		}
+
+		var localY = box.h * y;
+
+		if (terminal !== owner && terminal != null && terminal.geometry != null && terminal.geometry.relative !== true) {
+			localY = (terminal.geometry.y || 0) + (terminal.geometry.height || 0) * y;
+		}
+
+		return {
+			x: box.x + box.w * x,
+			y: box.y + localY,
+			box: box,
+			owner: owner,
+			vertical: y <= 0.05 || y >= 0.95
+		};
+	}
+
+	function segmentHitsBox(x1, y1, x2, y2, box) {
+		var left = box.x + 1;
+		var right = box.x + box.w - 1;
+		var top = box.y + 1;
+		var bottom = box.y + box.h - 1;
+
+		if (Math.abs(y1 - y2) < 0.5) {
+			var minX = Math.min(x1, x2);
+			var maxX = Math.max(x1, x2);
+
+			return y1 > top && y1 < bottom && maxX > left && minX < right;
+		}
+
+		if (Math.abs(x1 - x2) < 0.5) {
+			var minY = Math.min(y1, y2);
+			var maxY = Math.max(y1, y2);
+
+			return x1 > left && x1 < right && maxY > top && minY < bottom;
+		}
+
+		return false;
+	}
+
+	function pathHits(points, boxes) {
+		for (var i = 0; i < points.length - 1; i++) {
+			for (var b = 0; b < boxes.length; b++) {
+				if (segmentHitsBox(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y, boxes[b])) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	function orthPoints(a, b) {
+		if (a.vertical || b.vertical) {
+			var midY = (a.y + b.y) / 2;
+
+			return [
+				{ x: a.x, y: a.y },
+				{ x: a.x, y: midY },
+				{ x: b.x, y: midY },
+				{ x: b.x, y: b.y }
+			];
+		}
+
+		var midX = (a.x + b.x) / 2;
+
+		return [
+			{ x: a.x, y: a.y },
+			{ x: midX, y: a.y },
+			{ x: midX, y: b.y },
+			{ x: b.x, y: b.y }
+		];
+	}
+
+	function outsidePoint(anchor, lane) {
+		var box = anchor.box;
+		var gap = 18;
+
+		if (anchor.vertical) {
+			var y = anchor.y <= box.y + box.h / 2 ? box.y - gap : box.y + box.h + gap;
+
+			return { x: anchor.x, y: y };
+		}
+
+		var x = anchor.x <= box.x + box.w / 2 ? box.x - gap : box.x + box.w + gap;
+
+		return { x: x, y: lane };
+	}
+
+	function routeEdgeAroundClasses(graph, edge, classes) {
+		var source = terminalAnchor(graph, edge, true);
+		var target = terminalAnchor(graph, edge, false);
+
+		if (source == null || target == null || source.owner === target.owner) {
+			return;
+		}
+
+		var boxes = [];
+
+		for (var i = 0; i < classes.length; i++) {
+			if (classes[i] !== source.owner && classes[i] !== target.owner) {
+				boxes.push(cellBox(classes[i]));
+			}
+		}
+
+		var straight = orthPoints(source, target);
+		var model = graph.getModel();
+		var geo = edge.geometry != null ? edge.geometry.clone() : new mxGeometry();
+
+		if (!pathHits(straight, boxes)) {
+			if (geo.points != null) {
+				geo.points = null;
+				model.setGeometry(edge, geo);
+			}
+
+			return;
+		}
+
+		var span = [source.box, target.box].concat(boxes);
+		var top = span[0].y;
+		var bottom = span[0].y + span[0].h;
+
+		for (var s = 1; s < span.length; s++) {
+			top = Math.min(top, span[s].y);
+			bottom = Math.max(bottom, span[s].y + span[s].h);
+		}
+
+		var above = top - 28;
+		var below = bottom + 28;
+		var aboveCost = Math.abs(source.y - above) + Math.abs(target.y - above);
+		var belowCost = Math.abs(source.y - below) + Math.abs(target.y - below);
+		var lane = aboveCost <= belowCost ? above : below;
+		var out = outsidePoint(source, lane);
+		var into = outsidePoint(target, lane);
+		var via = source.vertical || target.vertical
+			? [
+				{ x: source.x, y: lane },
+				{ x: target.x, y: lane }
+			]
+			: [
+				{ x: out.x, y: source.y },
+				{ x: out.x, y: lane },
+				{ x: into.x, y: lane },
+				{ x: into.x, y: target.y }
+			];
+
+		if (pathHits([source].concat(via).concat([target]), boxes)) {
+			lane = lane === above ? below : above;
+			out = outsidePoint(source, lane);
+			into = outsidePoint(target, lane);
+			via = source.vertical || target.vertical
+				? [
+					{ x: source.x, y: lane },
+					{ x: target.x, y: lane }
+				]
+				: [
+					{ x: out.x, y: source.y },
+					{ x: out.x, y: lane },
+					{ x: into.x, y: lane },
+					{ x: into.x, y: target.y }
+				];
+		}
+
+		geo.points = via.map(function (pt) {
+			return makePoint(pt.x, pt.y);
+		});
+		model.setGeometry(edge, geo);
 	}
 
 	function makePoint(x, y) {
