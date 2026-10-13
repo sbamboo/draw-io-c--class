@@ -66,6 +66,18 @@
 		composition: 'composition'
 	};
 
+	var PALETTE = {
+		white: '#ffffff',
+		gray: '#f5f5f5',
+		grey: '#f5f5f5',
+		blue: '#dae8fc',
+		green: '#d5e8d4',
+		orange: '#ffe6cc',
+		yellow: '#fff2cc',
+		red: '#f8cecc',
+		purple: '#e1d5e7'
+	};
+
 	var NON_REF = {
 		void: true,
 		bool: true,
@@ -549,7 +561,7 @@
 						origin.y,
 						size.width,
 						size.height,
-						classStyle(size.startSize)
+						classStyle(size.startSize, model)
 					);
 					cursor += size.width + 40;
 				} else {
@@ -558,7 +570,7 @@
 					geo.height = size.height;
 					var parked = parkRowEdges(graph, cell);
 					graph.getModel().setValue(cell, userObject(model, source));
-					graph.getModel().setStyle(cell, classStyle(size.startSize));
+					graph.getModel().setStyle(cell, classStyle(size.startSize, model));
 					graph.getModel().setGeometry(cell, geo);
 					var kids = childVertices(graph, cell);
 
@@ -898,7 +910,7 @@
 		return style;
 	}
 
-	function applyConnectorStyle(graph, edge, parent) {
+	function applyConnectorStyle(graph, edge, parent, lineSpec) {
 		var model = graph.getModel();
 		var style = model.getStyle(edge) || '';
 		var implement = cellKind(parent) === 'interface';
@@ -917,6 +929,7 @@
 		style = setStyleValue(style, 'endArrow', implement ? 'block' : 'classic');
 		style = setStyleValue(style, 'endFill', implement ? '0' : '1');
 		style = setStyleValue(style, 'dashed', '0');
+		style = applyLinePattern(style, lineSpec);
 
 		if (implement) {
 			style = setStyleValue(style, 'endSize', '14');
@@ -958,9 +971,11 @@
 				}
 			}
 
+			var lineSpec = connectionLine(modelForCell(cell), '', modelForCell(parent), '');
+
 			if (found != null) {
 				keep[found.id] = true;
-				applyConnectorStyle(graph, found, parent);
+				applyConnectorStyle(graph, found, parent, lineSpec);
 				continue;
 			}
 
@@ -970,7 +985,7 @@
 				inheritValue(cell, bases[b]),
 				cell,
 				parent,
-				inheritStyle(parent, b, bases.length)
+				applyLinePattern(inheritStyle(parent, b, bases.length), lineSpec)
 			);
 		}
 
@@ -1087,7 +1102,74 @@
 		return null;
 	}
 
-	function applyRefStyle(graph, edge, kind, forceKind) {
+	function applyLinePattern(style, lineSpec) {
+		if (lineSpec == null) {
+			return style;
+		}
+
+		var next = style || '';
+
+		if (lineSpec.line === 'dashed') {
+			next = setStyleValue(next, 'dashed', '1');
+			next = setStyleValue(next, 'dashPattern', '8 8');
+		} else if (lineSpec.line === 'dotted') {
+			next = setStyleValue(next, 'dashed', '1');
+			next = setStyleValue(next, 'dashPattern', '1 3');
+		} else if (lineSpec.line === 'solid') {
+			next = setStyleValue(next, 'dashed', '0');
+		}
+
+		if (lineSpec.lineColor) {
+			next = setStyleValue(next, 'strokeColor', lineSpec.lineColor);
+		}
+
+		return next;
+	}
+
+	function memberByKey(model, key) {
+		if (model == null || !key) {
+			return null;
+		}
+
+		var members = (model.attributes || []).concat(model.operations || []);
+
+		for (var i = 0; i < members.length; i++) {
+			if (rowKey(members[i].text) === key) {
+				return members[i];
+			}
+		}
+
+		return null;
+	}
+
+	function lineFromEnd(model, memberKey) {
+		var member = memberByKey(model, memberKey);
+
+		return {
+			line: (member && member.line) || (model && model.line) || '',
+			lineColor: (member && member.lineColor) || (model && model.lineColor) || ''
+		};
+	}
+
+	function connectionLine(ownerModel, ownerKey, foreignModel, foreignKey) {
+		var owner = lineFromEnd(ownerModel, ownerKey);
+		var foreign = lineFromEnd(foreignModel, foreignKey);
+
+		return {
+			line: owner.line || foreign.line,
+			lineColor: owner.lineColor || foreign.lineColor
+		};
+	}
+
+	function terminalLineKey(graph, terminal) {
+		if (terminal == null || getPseudo(terminal) !== '') {
+			return '';
+		}
+
+		return rowKey(graph.getModel().getValue(terminal));
+	}
+
+	function applyRefStyle(graph, edge, kind, forceKind, lineSpec) {
 		var model = graph.getModel();
 		var style = model.getStyle(edge) || '';
 		var keepArrows = !forceKind && refKindFromStyle(style) != null;
@@ -1128,7 +1210,7 @@
 			next = setStyleValue(next, 'endArrow', 'diamond');
 		}
 
-		model.setStyle(edge, next);
+		model.setStyle(edge, applyLinePattern(next, lineSpec));
 	}
 
 	function findRow(graph, cell, key) {
@@ -1244,10 +1326,23 @@
 				break;
 			}
 
+			var lineSpec = connectionLine(
+				parsed,
+				ref.key,
+				modelForCell(classOwner(graph, target)),
+				''
+			);
+
 			if (found != null) {
 				keep[found.id] = true;
 				var model = graph.getModel();
 				var foreign = foreignTerminal(graph, found, row, target);
+				lineSpec = connectionLine(
+					parsed,
+					ref.key,
+					modelForCell(classOwner(graph, foreign)),
+					terminalLineKey(graph, foreign)
+				);
 
 				if (model.getTerminal(found, true) !== row) {
 					model.setTerminal(found, row, true);
@@ -1257,7 +1352,7 @@
 					model.setTerminal(found, foreign, false);
 				}
 
-				applyRefStyle(graph, found, ref.kind, refCodeChanged(found, ref));
+				applyRefStyle(graph, found, ref.kind, refCodeChanged(found, ref), lineSpec);
 				alignMemberHeight(graph, found, true);
 
 				if (foreign !== target && foreign !== row) {
@@ -1274,7 +1369,7 @@
 				refValue(cell, ref.key, ref),
 				row,
 				target,
-				refStyle(ref.kind)
+				applyLinePattern(refStyle(ref.kind), lineSpec)
 			);
 			keep[created.id] = true;
 		}
@@ -1509,10 +1604,10 @@
 	function fillCompartments(graph, cell, model, width) {
 		if (model.attributes.length) {
 			for (var i = 0; i < model.attributes.length; i++) {
-				addRow(graph, cell, model.attributes[i], width);
+				addRow(graph, cell, model.attributes[i], width, model);
 			}
 		} else if (model.kind === 'enum') {
-			addRow(graph, cell, { text: '', fontStyle: 0 }, width);
+			addRow(graph, cell, { text: '', fontStyle: 0 }, width, model);
 		}
 
 		if (model.kind === 'enum') {
@@ -1523,22 +1618,44 @@
 		divider.setConnectable(false);
 
 		for (var j = 0; j < model.operations.length; j++) {
-			addRow(graph, cell, model.operations[j], width);
+			addRow(graph, cell, model.operations[j], width, model);
 		}
 	}
 
-	function addRow(graph, cell, member, width) {
+	function addRow(graph, cell, member, width, model) {
 		var style = ROW_STYLE;
 
 		if (member.fontStyle) {
 			style += 'fontStyle=' + member.fontStyle + ';';
 		}
 
+		style += paintStyle({
+			fill: member.fill || (model && model.fill) || '',
+			fontColor: member.fontColor || (model && model.fontColor) || ''
+		});
 		graph.insertVertex(cell, null, member.text, 0, 0, width, 26, style);
 	}
 
-	function classStyle(startSize) {
-		return CLASS_STYLE.replace('START', String(startSize));
+	function classStyle(startSize, model) {
+		return CLASS_STYLE.replace('START', String(startSize)) + paintStyle(model);
+	}
+
+	function paintStyle(item) {
+		if (item == null) {
+			return '';
+		}
+
+		var style = '';
+
+		if (item.fill) {
+			style += 'fillColor=' + item.fill + ';';
+		}
+
+		if (item.fontColor) {
+			style += 'fontColor=' + item.fontColor + ';';
+		}
+
+		return style;
 	}
 
 	function userObject(model, source) {
@@ -1784,9 +1901,14 @@
 
 			var terminated = /;\s*$/.test(code);
 			var headerLine = code.replace(/\{\s*$/, '').trim().replace(/;+\s*$/, '').trim();
-			var header = parseHeader(headerLine);
+			var headerPaint = extractRefs(headerLine);
+			var header = parseHeader(headerPaint.text);
 
 			if (header != null) {
+				header.fill = headerPaint.fill;
+				header.fontColor = headerPaint.color;
+				header.line = headerPaint.line;
+				header.lineColor = headerPaint.lineColor;
 				finishClass();
 				skipDepth = 0;
 				propertyDepth = 0;
@@ -2317,6 +2439,10 @@
 		var refs = [];
 		var quote = '';
 		var out = '';
+		var fill = '';
+		var color = '';
+		var linePattern = '';
+		var lineColor = '';
 
 		for (var i = 0; i < line.length; i++) {
 			var ch = line.charAt(i);
@@ -2343,7 +2469,20 @@
 				var parsed = readRefMarker(line, i + 1);
 
 				if (parsed != null) {
-					refs.push(parsed.ref);
+					if (parsed.paint) {
+						if (parsed.paint.key === 'fill') {
+							fill = parsed.paint.value;
+						} else if (parsed.paint.key === 'color') {
+							color = parsed.paint.value;
+						} else if (parsed.paint.key === 'line') {
+							linePattern = parsed.paint.value;
+						} else {
+							lineColor = parsed.paint.value;
+						}
+					} else {
+						refs.push(parsed.ref);
+					}
+
 					i = parsed.end - 1;
 					continue;
 				}
@@ -2354,8 +2493,90 @@
 
 		return {
 			text: out.replace(/[ \t]{2,}/g, ' ').trim(),
-			refs: refs
+			refs: refs,
+			fill: fill,
+			color: color,
+			line: linePattern,
+			lineColor: lineColor
 		};
+	}
+
+	function readLinePattern(line, start) {
+		var i = start;
+
+		while (i < line.length && /\s/.test(line.charAt(i))) {
+			i++;
+		}
+
+		var match = /^(solid|dashed|dotted)\b/i.exec(line.slice(i));
+
+		if (match == null) {
+			return null;
+		}
+
+		return {
+			end: i + match[0].length,
+			value: match[1].toLowerCase()
+		};
+	}
+
+	function readPaint(line, start) {
+		var i = start;
+
+		while (i < line.length && /\s/.test(line.charAt(i))) {
+			i++;
+		}
+
+		var token = '';
+
+		if (line.charAt(i) === '#') {
+			token = '#';
+			i++;
+
+			while (i < line.length && /[0-9A-Fa-f]/.test(line.charAt(i))) {
+				token += line.charAt(i);
+				i++;
+			}
+		} else {
+			while (i < line.length && /[A-Za-z0-9-]/.test(line.charAt(i))) {
+				token += line.charAt(i);
+				i++;
+			}
+		}
+
+		var value = resolvePaint(token);
+
+		if (value == null) {
+			return null;
+		}
+
+		return { end: i, value: value };
+	}
+
+	function resolvePaint(token) {
+		if (!token || token === '#') {
+			return null;
+		}
+
+		var named = PALETTE[token.toLowerCase()];
+
+		if (named) {
+			return named;
+		}
+
+		if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(token)) {
+			return token.toLowerCase();
+		}
+
+		if (/^[0-9A-Fa-f]{6}$/.test(token) || /^[0-9A-Fa-f]{3}$/.test(token) || /^[0-9A-Fa-f]{8}$/.test(token)) {
+			return '#' + token.toLowerCase();
+		}
+
+		if (/^[A-Za-z][A-Za-z0-9-]*$/.test(token)) {
+			return token.toLowerCase();
+		}
+
+		return null;
 	}
 
 	function readRefMarker(line, start) {
@@ -2363,6 +2584,27 @@
 
 		while (i < line.length && /\s/.test(line.charAt(i))) {
 			i++;
+		}
+
+		var paintMatch = /^(line(?:\s*\.\s*color)?|fill|color)\s*:/i.exec(line.slice(i));
+
+		if (paintMatch) {
+			var paintKey = paintMatch[1].toLowerCase().replace(/\s+/g, '');
+			var paint = paintKey === 'line'
+				? readLinePattern(line, i + paintMatch[0].length)
+				: readPaint(line, i + paintMatch[0].length);
+
+			if (paint == null) {
+				return null;
+			}
+
+			return {
+				end: paint.end,
+				paint: {
+					key: paintKey === 'line.color' ? 'lineColor' : paintKey,
+					value: paint.value
+				}
+			};
 		}
 
 		var kind = 'association';
@@ -2754,7 +2996,11 @@
 			return attachRefs({
 				kind: 'operation',
 				text: text + suffixText,
-				fontStyle: fontStyle
+				fontStyle: fontStyle,
+				fill: extracted.fill,
+				fontColor: extracted.color,
+				line: extracted.line,
+				lineColor: extracted.lineColor
 			}, explicitRefs, operation.type && !operation.isConstructor ? [operation.type] : [], operation.paramTypes);
 		}
 
@@ -2781,7 +3027,11 @@
 		return attachRefs({
 			kind: isProperty ? 'property' : 'attribute',
 			text: field + suffixText,
-			fontStyle: fontStyle
+			fontStyle: fontStyle,
+			fill: extracted.fill,
+			fontColor: extracted.color,
+			line: extracted.line,
+			lineColor: extracted.lineColor
 		}, explicitRefs, named.type ? [named.type] : []);
 	}
 
@@ -3172,6 +3422,7 @@
 	return {
 		install: install,
 		parseDocument: parseDocument,
+		connectionLine: connectionLine,
 		attachMonaco: attachMonaco
 	};
 });

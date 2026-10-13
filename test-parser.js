@@ -1,5 +1,6 @@
 var assert = require('assert');
-var parseDocument = require('./csharp-uml.js').parseDocument;
+var csharp = require('./csharp-uml.js');
+var parseDocument = csharp.parseDocument;
 
 var sample = parseDocument([
 	'class MYClass {',
@@ -303,5 +304,72 @@ assert.deepStrictEqual(scene[0].operations.map(function (member) { return member
 	'+ Bounds: FloatRect {readOnly}',
 	'+ Update(deltaTime: float): void'
 ]);
+
+var painted = parseDocument([
+	'class Car §fill:blue §color:white {',
+	'public Engine Motor §comp:Engine §fill:yellow §color:#112233',
+	'public void Drive(Road road) §assoc:Logger § fill : green',
+	'public string Title = "§fill:red" §color:navy',
+	'private string noted // §fill:red',
+	'}',
+	'enum Tone §color:purple',
+	'Red §fill:grey',
+	'interface IGate §color:orange §fill:AABBCC'
+].join('\n'));
+
+assert.strictEqual(painted[0].name, 'Car');
+assert.strictEqual(painted[0].fill, '#dae8fc');
+assert.strictEqual(painted[0].fontColor, '#ffffff');
+assert.strictEqual(painted[0].attributes[0].text, '+ Motor: Engine');
+assert.strictEqual(painted[0].attributes[0].fill, '#fff2cc');
+assert.strictEqual(painted[0].attributes[0].fontColor, '#112233');
+assert.strictEqual(refText(painted[0].attributes[0]), 'composition!:Engine');
+assert.strictEqual(painted[0].operations[0].fill, '#d5e8d4');
+assert.strictEqual(refText(painted[0].operations[0]), 'association:Road,association!:Logger');
+assert.strictEqual(painted[0].attributes[1].text, '+ Title: string = "§fill:red"');
+assert.strictEqual(painted[0].attributes[1].fill, '');
+assert.strictEqual(painted[0].attributes[1].fontColor, 'navy');
+assert.strictEqual(painted[0].attributes[2].fill, '');
+assert.strictEqual(painted[1].fontColor, '#e1d5e7');
+assert.strictEqual(painted[1].attributes[0].fill, '#f5f5f5');
+assert.strictEqual(painted[2].fill, '#aabbcc');
+assert.strictEqual(painted[2].fontColor, '#ffe6cc');
+
+var lined = parseDocument([
+	'class Car §line:dashed §line.color:blue {',
+	'public Engine Motor §comp:Engine §line:dotted §line.color:#010203',
+	'public void Drive(Road road) §assoc:Logger § line : solid',
+	'}',
+	'class Engine §line.color:red',
+	'class Logger §line:dashed'
+].join('\n'));
+
+assert.strictEqual(lined[0].line, 'dashed');
+assert.strictEqual(lined[0].lineColor, '#dae8fc');
+assert.strictEqual(lined[0].attributes[0].text, '+ Motor: Engine');
+assert.strictEqual(lined[0].attributes[0].line, 'dotted');
+assert.strictEqual(lined[0].attributes[0].lineColor, '#010203');
+assert.strictEqual(refText(lined[0].attributes[0]), 'composition!:Engine');
+assert.strictEqual(lined[0].operations[0].line, 'solid');
+assert.strictEqual(lined[0].operations[0].lineColor, '');
+assert.strictEqual(lined[1].lineColor, '#f8cecc');
+assert.strictEqual(lined[2].line, 'dashed');
+
+assert.deepStrictEqual(csharp.connectionLine(lined[0], lined[0].attributes[0].text, lined[1], ''), {
+	line: 'dotted',
+	lineColor: '#010203'
+});
+assert.deepStrictEqual(csharp.connectionLine(lined[0], lined[0].operations[0].text, lined[2], ''), {
+	line: 'solid',
+	lineColor: '#dae8fc'
+});
+assert.deepStrictEqual(csharp.connectionLine(lined[0], '', lined[1], ''), {
+	line: 'dashed',
+	lineColor: '#dae8fc'
+});
+assert.deepStrictEqual(csharp.connectionLine({ line: '', lineColor: '' }, '', lined[1], ''), {
+	line: '',
+	lineColor: '#f8cecc'
+});
 
 console.log('parser ok');
