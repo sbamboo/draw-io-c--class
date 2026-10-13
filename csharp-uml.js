@@ -3070,18 +3070,25 @@
 	}
 
 	function formatParam(param) {
-		var value = stripDefault(param).replace(/^(out|ref|in|params|this)\s+/i, '').trim();
+		var raw = stripDefault(param).trim();
+		var passing = /^(out|ref|in)\s+/i.exec(raw);
+		var value = raw.replace(/^(out|ref|in|params|this)\s+/i, '').trim();
 		var named = splitTypeAndName(value);
+		var shown = named.name;
+
+		if (passing && shown) {
+			shown = passing[1].toLowerCase() + ' ' + shown;
+		}
 
 		if (!named.name) {
 			return escapeHtml(value);
 		}
 
 		if (!named.type) {
-			return escapeHtml(named.name);
+			return escapeHtml(shown);
 		}
 
-		return escapeHtml(named.name) + ': ' + escapeHtml(named.type);
+		return escapeHtml(shown) + ': ' + escapeHtml(named.type);
 	}
 
 	function stripDefault(param) {

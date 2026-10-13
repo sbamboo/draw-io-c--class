@@ -114,6 +114,9 @@ assert.strictEqual(titled[0].fill, '#dae8fc');
 assert.strictEqual(titled[0].line, 'dashed');
 assert.strictEqual(titled[0].comment, '// sketch');
 assert.strictEqual(parseDocument('interface Gate')[0].stereotypes.join(','), 'interface');
+
+var passing = parseDocument('class Lookup\npublic bool TryGet(in string key, out T found, ref int count, string plain)');
+assert.strictEqual(passing[0].operations[0].text, '+ TryGet(in key: string, out found: T, ref count: int, plain: string): bool');
 var derived = parseDocument('class MyClass : ParentClass, IExampleInterface <<entity>>\ninterface IExampleInterface : IOther\nclass Bag<T> : Collection<T>');
 assert.deepStrictEqual(derived[0].bases, ['ParentClass', 'IExampleInterface']);
 assert.deepStrictEqual(derived[0].stereotypes, ['entity']);
