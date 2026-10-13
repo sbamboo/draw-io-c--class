@@ -39,7 +39,7 @@ var shape = parseDocument([
 	'}'
 ].join('\n'));
 
-assert.deepStrictEqual(shape[0].stereotypes, ['abstract', 'entity']);
+assert.deepStrictEqual(shape[0].stereotypes, ['entity']);
 assert.strictEqual(shape[0].italic, true);
 assert.strictEqual(shape[0].operations[0].text, '+ Count: int {readOnly}{static}');
 assert.strictEqual(shape[0].operations[0].fontStyle, 4);
@@ -51,12 +51,12 @@ assert.strictEqual(shape[0].operations[4].text, '# Hide(): void');
 assert.deepStrictEqual(shape[0].attributes, []);
 
 var iface = parseDocument('interface IFoo <<service>>\nvoid Run(int x, Dictionary<string, int> map)');
-assert.deepStrictEqual(iface[0].stereotypes, ['interface', 'service']);
+assert.deepStrictEqual(iface[0].stereotypes, ['service']);
 assert.strictEqual(iface[0].italic, true);
 assert.strictEqual(iface[0].operations[0].text, '+ Run(x: int, map: Dictionary&lt;string, int&gt;): void');
 
 var enumerated = parseDocument('enum Color <<flags>>\nRed\nGreen');
-assert.deepStrictEqual(enumerated[0].stereotypes, ['enum', 'flags']);
+assert.deepStrictEqual(enumerated[0].stereotypes, ['flags']);
 assert.strictEqual(enumerated[0].italic, false);
 assert.deepStrictEqual(enumerated[0].attributes.map(function (m) { return m.text; }), ['Red', 'Green']);
 assert.deepStrictEqual(enumerated[0].operations, []);
@@ -65,7 +65,7 @@ var markedEnum = parseDocument('enum Access\npublic Read\nprivate Write');
 assert.deepStrictEqual(markedEnum[0].attributes.map(function (m) { return m.text; }), ['Read', 'Write']);
 
 var structured = parseDocument('public struct Point <<value>>\npublic int X\nprivate int Y\nprotected void Shift()');
-assert.deepStrictEqual(structured[0].stereotypes, ['struct', 'value']);
+assert.deepStrictEqual(structured[0].stereotypes, ['value']);
 assert.strictEqual(structured[0].italic, false);
 assert.deepStrictEqual(structured[0].attributes.map(function (m) { return m.text; }), ['+ X: int', '- Y: int']);
 assert.strictEqual(structured[0].operations[0].text, '# Shift(): void');
@@ -106,6 +106,14 @@ assert.strictEqual(noted[0].operations[2].text, '+ Depth: int {readOnly} <font c
 assert.strictEqual(noted[0].operations[3].text, '+ Area: int');
 assert.strictEqual(noted[0].operations[4].text, '- Reset(): void <font color="#008000">// clears</font>');
 assert.deepStrictEqual(noted[0].attributes, []);
+
+var titled = parseDocument('abstract class Shape <<some thing>> §fill:blue §line:dashed // sketch');
+assert.deepStrictEqual(titled[0].stereotypes, ['some thing']);
+assert.strictEqual(titled[0].italic, true);
+assert.strictEqual(titled[0].fill, '#dae8fc');
+assert.strictEqual(titled[0].line, 'dashed');
+assert.strictEqual(titled[0].comment, '// sketch');
+assert.strictEqual(parseDocument('interface Gate')[0].stereotypes.join(','), 'interface');
 var derived = parseDocument('class MyClass : ParentClass, IExampleInterface <<entity>>\ninterface IExampleInterface : IOther\nclass Bag<T> : Collection<T>');
 assert.deepStrictEqual(derived[0].bases, ['ParentClass', 'IExampleInterface']);
 assert.deepStrictEqual(derived[0].stereotypes, ['entity']);

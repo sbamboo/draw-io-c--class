@@ -1671,7 +1671,7 @@
 			return '&lt;&lt;' + escapeHtml(stereotype) + '&gt;&gt;';
 		});
 		var name = escapeHtml(model.name);
-		lines.push(model.italic ? '<b><i>' + name + '</i></b>' : '<b>' + name + '</b>');
+		lines.push((model.italic ? '<b><i>' + name + '</i></b>' : '<b>' + name + '</b>') + formatComment(model.comment));
 		return lines.join('<br>');
 	}
 
@@ -1679,7 +1679,7 @@
 		var lines = model.stereotypes.map(function (stereotype) {
 			return '<<' + stereotype + '>>';
 		});
-		lines.push(model.name);
+		lines.push(model.name + (model.comment ? ' ' + model.comment : ''));
 		model.attributes.concat(model.operations).forEach(function (member) {
 			lines.push(visibleText(member.text));
 		});
@@ -1909,6 +1909,7 @@
 				header.fontColor = headerPaint.color;
 				header.line = headerPaint.line;
 				header.lineColor = headerPaint.lineColor;
+				header.comment = split.comment;
 				finishClass();
 				skipDepth = 0;
 				propertyDepth = 0;
@@ -2356,27 +2357,29 @@
 		var declared = stereotypes.slice();
 		stereotypes.length = 0;
 
-		if (kind === 'interface') {
-			pushStereotype(stereotypes, 'interface');
-		}
+		if (!declared.length) {
+			if (kind === 'interface') {
+				pushStereotype(stereotypes, 'interface');
+			}
 
-		if (kind === 'enum') {
-			pushStereotype(stereotypes, 'enum');
-		}
+			if (kind === 'enum') {
+				pushStereotype(stereotypes, 'enum');
+			}
 
-		if (kind === 'struct') {
-			pushStereotype(stereotypes, 'struct');
-		}
+			if (kind === 'struct') {
+				pushStereotype(stereotypes, 'struct');
+			}
 
-		if (modifiers.indexOf('abstract') >= 0) {
-			pushStereotype(stereotypes, 'abstract');
+			if (modifiers.indexOf('abstract') >= 0) {
+				pushStereotype(stereotypes, 'abstract');
+			}
 		}
 
 		for (var s = 0; s < declared.length; s++) {
 			pushStereotype(stereotypes, declared[s]);
 		}
 
-		var italic = kind === 'interface' || stereotypes.some(function (stereotype) {
+		var italic = kind === 'interface' || modifiers.indexOf('abstract') >= 0 || stereotypes.some(function (stereotype) {
 			var key = stereotype.toLowerCase();
 			return key === 'abstract' || key === 'interface';
 		});
